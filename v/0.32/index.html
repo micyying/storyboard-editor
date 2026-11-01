@@ -1,0 +1,2129 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Storyboard Editor · Micy</title>
+  <meta name="description" content="可編輯的 Storyboard／Shotlist 工具：匯入劇本、整理參考圖、安排 Shot Order 與打印 PDF。" />
+  <style>
+    :root {
+      --ink: #20252b;
+      --muted: #6b727b;
+      --line: #20252b;
+      --blue: #2c5687;
+      --yellow: #f4d34f;
+      --paper: #fffef9;
+      --soft: #f4f1e6;
+      --mint: #e4f3ef;
+      --red: #d9362f;
+      --shadow: 0 18px 50px rgba(31, 37, 43, .13);
+    }
+    * { box-sizing: border-box; }
+    html { background: #e8e5db; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: #e8e5db;
+      font-family: -apple-system, BlinkMacSystemFont, "PingFang TC", "Noto Sans TC", "Helvetica Neue", Arial, sans-serif;
+      line-height: 1.45;
+    }
+    button, input { font: inherit; }
+    button { cursor: pointer; }
+    .appbar {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-height: 62px;
+      padding: 10px 18px;
+      color: #fff;
+      background: #1f2933;
+      box-shadow: 0 3px 12px rgba(0,0,0,.18);
+    }
+    .brand { margin-right: auto; }
+    .brand strong { display: block; font-size: 16px; letter-spacing: .04em; }
+    .brand small { color: #bbc5cf; font-size: 11px; }
+    .toolbar { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+    .toolbar button, .file-button, .toolbar-menu > summary {
+      border: 1px solid #5b6b7b;
+      border-radius: 7px;
+      color: #fff;
+      background: #2c3a48;
+      padding: 7px 10px;
+      font-size: 12px;
+    }
+    .toolbar button:hover, .file-button:hover, .toolbar-menu > summary:hover { background: #3b4c5d; }
+    .toolbar-menu { position: relative; }
+    .toolbar-menu > summary { display: block; list-style: none; cursor: pointer; user-select: none; white-space: nowrap; }
+    .toolbar-menu > summary::-webkit-details-marker { display: none; }
+    .toolbar-menu > summary:focus-visible { outline: 2px solid #b9ddff; outline-offset: 2px; }
+    .toolbar-menu[open] > summary { background: #3b4c5d; }
+    .toolbar-panel { position: absolute; top: calc(100% + 7px); left: 0; z-index: 12; display: grid; gap: 5px; min-width: 250px; padding: 8px; border: 1px solid #8d9ba7; border-radius: 8px; background: #26323d; box-shadow: 0 10px 28px #0005; }
+    .toolbar-panel > button, .toolbar-panel > .file-button { display: block; width: 100%; text-align: left; white-space: nowrap; }
+    .toolbar-panel > button:disabled { opacity: .48; cursor: default; }
+    .toolbar-panel .file-button { overflow: hidden; }
+    #saveBtn { background: #315f86; border-color: #7ea5c5; }
+    .file-button input { display: none; }
+    .status { color: #b8e6bb; font-size: 11px; min-width: 85px; text-align: right; }
+    .import-notice {
+      margin: 0 0 14px;
+      border-left: 4px solid #9da5ab;
+      color: #4d565d;
+      background: #f0f2f1;
+      padding: 8px 10px;
+      font-size: 12px;
+    }
+    .import-notice.success { border-color: #4a9b58; background: #edf7ee; color: #286333; }
+    .import-notice.error { border-color: #c6473e; background: #fff0ee; color: #8e2e29; }
+    .import-notice[hidden] { display: none; }
+    [hidden] { display: none !important; }
+    .shot-table { min-width: 1200px; }
+    .shot-table td[contenteditable], .description-text { white-space: pre-wrap; overflow-wrap: anywhere; }
+    .file-button { position: relative; cursor: pointer; }
+    .file-button #scriptInput, .file-button #restoreInput { display: block; position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+    .drop-hint { color: var(--muted); font-size: 12px; margin: 10px 12px 0; }
+    .drop-active { outline: 3px dashed #2c5687; outline-offset: -4px; background: #e6f2fa !important; }
+    #storageNotice { margin: 12px 22px; padding: 10px; background: #fff0d7; color: #733c09; font-size: 13px; }
+    @media print { #storageNotice, .drop-hint { display: none !important; } }
+    #pasteDialog { width: min(700px, 92vw); border: 1px solid #bcc0bf; border-radius: 12px; padding: 22px; }
+    #pasteDialog::backdrop { background: #18233088; }
+    #pasteDialog textarea { width: 100%; min-height: 260px; font: inherit; margin: 12px 0; padding: 10px; }
+    #pasteDialog button { padding: 8px 12px; margin-right: 8px; }
+    #helpDialog { width: min(620px, 92vw); max-height: 85vh; overflow: auto; border: 1px solid #bcc0bf; border-radius: 12px; padding: 22px; }
+    #helpDialog::backdrop { background: #18233088; }
+    #helpDialog p { margin: 12px 0; font-size: 14px; }
+    #helpDialog button { padding: 8px 16px; }
+    .script-source { margin-top: 18px; font-size: 12px; color: #62696d; }
+    .script-source pre { white-space: pre-wrap; max-height: 300px; overflow: auto; }
+    @media print { .import-notice, .script-source, #pasteDialog { display: none !important; } .shot-table { min-width: 0; } }
+    main { max-width: 1480px; margin: 30px auto 70px; padding: 0 22px; }
+    .paper {
+      background: var(--paper);
+      border: 1px solid #d0cec3;
+      box-shadow: var(--shadow);
+      padding: 22px;
+    }
+    .title-line { display: flex; align-items: end; gap: 14px; margin-bottom: 18px; }
+    .title-line input {
+      width: min(680px, 100%);
+      border: 0;
+      border-bottom: 2px solid var(--line);
+      color: var(--ink);
+      background: transparent;
+      padding: 4px 0;
+      font-size: 28px;
+      font-weight: 700;
+      outline: none;
+    }
+    .title-line span { color: var(--muted); font-size: 12px; }
+    .scene { margin-top: 22px; border: 1px solid var(--line); background: #fff; }
+    .scene-head {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-height: 44px;
+      padding: 8px 12px;
+      background: var(--yellow);
+      font-weight: 700;
+    }
+    .scene-head [contenteditable] { flex: 1; outline: none; }
+    .scene-actions { display: flex; gap: 5px; }
+    .icon-button {
+      border: 1px solid rgba(32,37,43,.35);
+      border-radius: 5px;
+      color: var(--ink);
+      background: rgba(255,255,255,.4);
+      padding: 3px 7px;
+      font-size: 11px;
+    }
+    .scene-actions .danger { color: #9f211d; }
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+    th, td { border: 1px solid var(--line); vertical-align: top; }
+    th {
+      padding: 7px 6px;
+      color: #fff;
+      background: var(--blue);
+      font-size: 12px;
+      letter-spacing: .02em;
+    }
+    td { min-height: 66px; padding: 7px; font-size: 13px; }
+    td[contenteditable="true"] { outline: none; }
+    td[contenteditable="true"]:focus, [contenteditable="true"]:focus { box-shadow: inset 0 0 0 2px rgba(44,86,135,.25); }
+    .shot-table th:nth-child(1), .shot-table td:nth-child(1) { width: 96px; text-align: center; }
+    .shot-table th:nth-child(2), .shot-table td:nth-child(2) { width: 21%; }
+    .shot-table th:nth-child(3), .shot-table td:nth-child(3) { width: 16%; }
+    .shot-table th:nth-child(4), .shot-table td:nth-child(4) { width: 39%; }
+    .shot-table th:nth-child(5), .shot-table td:nth-child(5) { width: 16%; }
+    .props-location-cell { min-width: 0; }
+    .props-location-cell .props-cell { padding-bottom: 5px; margin-bottom: 5px; border-bottom: 1px solid #d6d5cd; }
+    .props-location-cell .location-cell::before { content: 'Location'; display: block; margin-bottom: 3px; color: #68757d; font-size: 10px; font-weight: 700; }
+    .props-location-cell .location-cell img { max-height: 120px; }
+    .shot-row { background: #fff; }
+    .shot-row[data-tint="mint"] { background: var(--mint); }
+    .shot-row.dragging { opacity: .45; }
+    .shot-no { font-size: 15px; font-weight: 700; }
+    .row-tools { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; margin-top: 7px; }
+    .row-tools button { min-width: 0; min-height: 36px; border: 1px solid #afb4b8; border-radius: 4px; color: var(--muted); background: #fff; padding: 2px; font-size: 12px; }
+    .drag-handle { width: 100%; min-height: 27px; margin-top: 4px; border: 1px dashed #a7afb5; border-radius: 4px; color: #596872; background: #f8fafb; font-size: 10px; cursor: grab; }
+    .drag-handle:active { cursor: grabbing; }
+    .cam-box { display: grid; gap: 4px; text-align: left; }
+    .cam-box select { width: 100%; min-width: 0; padding: 3px 4px; border: 1px solid #adb5bc; border-radius: 4px; color: var(--ink); background: #fff; font-size: 11px; }
+    .cam-coverage, .cam-special { border: 1px solid #d3d9dc; border-radius: 5px; padding: 4px; background: #f8fafb; }
+    .cam-hint { display: none; }
+    .cam-takes { display: grid; gap: 3px; }
+    .coverage-take { border-bottom: 1px solid #d9dfe2; padding-bottom: 3px; }
+    .coverage-take-head, .coverage-item { display: flex; align-items: center; gap: 3px; }
+    .coverage-take-name { flex: 1; min-width: 0; font-size: 11px; font-weight: 700; outline: none; }
+    .coverage-item { margin-top: 2px; }
+    .coverage-item input { width: 14px; height: 14px; margin: 0; flex: none; }
+    .coverage-name { flex: 1; min-width: 0; padding: 1px; font-size: 11px; overflow-wrap: anywhere; outline: none; }
+    .coverage-name:empty::before { content: '機位／人物…'; color: #92989a; }
+    .cam-box button { border: 1px solid #bcc5ca; border-radius: 4px; background: #fff; color: #485b66; cursor: pointer; font-size: 11px; }
+    .cam-remove { width: 20px; height: 20px; flex: none; }
+    .cam-add-take, .cam-add-item { margin-top: 3px; padding: 2px 4px; }
+    .cam-detail { display: grid; grid-template-columns: 48px minmax(0, 1fr); align-items: center; gap: 2px; margin-bottom: 3px; }
+    .cam-detail span { color: #68757d; font-size: 10px; }
+    .cam-detail-value, .cam-note { min-height: 21px; padding: 2px 4px; border: 1px solid #d3d9dc; background: #fff; font-size: 11px; white-space: pre-wrap; overflow-wrap: anywhere; outline: none; }
+    .cam-detail-value:empty::before { content: '點此輸入…'; color: #92989a; }
+    .description-cell { white-space: normal; }
+    .description-text { min-height: 48px; outline: none; }
+    .description-text:empty::before { content: 'Action、對白、reaction、拍攝備註…'; color: #92989a; }
+    .cam-note:empty::before { content: '其他 Cam 備註…'; color: #92989a; }
+    .cam-notes summary { color: #68757d; font-size: 10px; cursor: pointer; }
+    .ref-cell { min-height: 70px; }
+    .ref-cell img { display: block; width: 100%; max-height: 180px; object-fit: contain; border: 1px solid #cbc8ba; background: #f4f1e6; }
+    .ref-image { position: relative; margin-bottom: 8px; break-inside: avoid; }
+    .ref-image .remove-ref { position: absolute; top: 4px; right: 4px; min-width: 28px; min-height: 28px; background: #fff; }
+    .ref-image-note, .ref-link-note, .ref-note, .location-image-note, .location-text, .props-text {
+      min-height: 25px; padding: 4px 5px; white-space: pre-wrap; overflow-wrap: anywhere; outline: none;
+    }
+    .ref-image-note, .ref-link-note, .location-image-note { font-size: 11px; color: #525b61; border: 1px solid #d6d5cd; border-top: 0; }
+    .ref-note { margin-top: 7px; border: 1px solid #d6d5cd; background: #fffef9; }
+    .ref-image-note:empty::before, .ref-link-note:empty::before, .location-image-note:empty::before { content: '圖片／連結備註…'; color: #92989a; }
+    .ref-note:empty::before { content: 'Ref 其他備註…'; color: #92989a; }
+    .props-suggest { padding: 3px 6px; border: 1px solid #bbc0bf; border-radius: 4px; background: #f5f8f7; color: #3f555e; font-size: 10px; }
+    .ref-link { position: relative; margin-top: 7px; padding: 5px; border: 1px solid #d6d5cd; background: #f9faf6; }
+    .ref-link a { display: block; padding-right: 25px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; }
+    .ref-link .remove-link { position: absolute; right: 3px; top: 3px; }
+    .ref-link-note:empty::before { content: '連結備註…'; }
+    .location-cell img { display: block; width: 100%; max-height: 180px; object-fit: contain; background: #f4f1e6; }
+    .location-text { margin-bottom: 6px; border: 1px solid transparent; }
+    .location-text:empty::before { content: '地點／場景文字…'; color: #92989a; }
+    .location-image { position: relative; margin: 6px 0; border: 1px solid #d6d5cd; }
+    .location-image .remove-location-image { position: absolute; top: 4px; right: 4px; background: #fff; }
+    .location-tools label { display: inline-block; padding: 3px 5px; border: 1px solid #bbc0bf; border-radius: 4px; color: #3f555e; cursor: pointer; font-size: 10px; }
+    .location-tools input { display: none; }
+    .props-text:empty::before { content: '道具／服化備註…'; color: #92989a; }
+    .props-suggest { margin-top: 6px; }
+    .legacy-tone-note { margin: 10px 12px; border: 1px solid #d6d5cd; padding: 8px; color: #525b61; font-size: 12px; }
+    .legacy-tone-body { min-height: 36px; padding: 5px; white-space: pre-wrap; outline: none; }
+    .ref-placeholder { display: grid; place-items: center; min-height: 68px; border: 1px dashed #a9aaa4; color: #85877f; font-size: 11px; text-align: center; padding: 8px; }
+    .ref-tools { display: flex; align-items: center; gap: 5px; }
+    .ref-tools label { border: 1px solid #aeb3b6; border-radius: 4px; color: var(--muted); background: #fff; padding: 3px 5px; font-size: 10px; cursor: pointer; }
+    .ref-tools input { display: none; }
+    .add-shot { margin: 8px; border: 1px dashed #8b9299; border-radius: 6px; color: #48525c; background: #fff; padding: 6px 10px; font-size: 12px; }
+    .add-shot:hover { background: #f4f7f8; }
+    .add-order-row { margin: 7px 0 9px; border: 1px dashed #8b9299; border-radius: 5px; color: #48525c; background: #fff; padding: 5px 9px; font-size: 11px; cursor: pointer; }
+    .add-order-row:hover { background: #f4f7f8; }
+    .free-section { margin-top: 25px; border: 1px solid #c7c4b9; background: #fff; }
+    .free-head { padding: 8px 12px; color: #fff; background: #747b80; font-size: 15px; font-weight: 700; }
+    .ref-category { border-top: 1px solid #d6d5cd; }
+    .ref-category-title { padding: 8px 12px 0; color: #43515b; font-size: 12px; font-weight: 700; }
+    .ref-category .drop-hint { margin-top: 4px; }
+    .location-ref-groups { padding: 0 10px 10px; }
+    .location-ref-group { margin: 10px 0; border: 1px solid #d6d5cd; border-radius: 5px; background: #fff; }
+    .location-ref-group-head { display: flex; align-items: center; gap: 8px; padding: 6px 9px; background: #f4f1e6; }
+    .location-ref-title { flex: 1; min-width: 0; min-height: 22px; font-size: 12px; font-weight: 700; outline: none; }
+    .location-ref-title:empty::before { content: '輸入地點／Scene 名稱'; color: #92989a; }
+    .location-ref-group-head button, .add-location-group { border: 1px solid #aeb3b6; border-radius: 4px; color: #52616a; background: #fff; padding: 4px 7px; font-size: 11px; }
+    .location-ref-group .drop-hint { margin: 4px 10px 0; }
+    .location-ref-group .media-grid { padding: 8px; }
+    .add-location-group { margin: 0 0 0 0; padding: 6px 10px; }
+    .free-body { min-height: 105px; padding: 13px; outline: none; }
+    .media-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; padding: 12px; }
+    .media-card { position: relative; min-height: 125px; border: 1px dashed #a9aaa4; background: #faf9f2; overflow: hidden; }
+    .media-card.dragging { opacity: .45; }
+    .media-card img { width: auto; height: auto; max-width: 100%; max-height: 320px; object-fit: contain; display: block; margin: 0 auto; background: #f4f1e6; }
+    .media-card .media-caption { padding: 5px 7px; color: var(--muted); font-size: 11px; outline: none; }
+    .media-card .remove-media { position: absolute; top: 5px; right: 5px; }
+    .media-order-tools { position: absolute; top: 5px; left: 5px; z-index: 1; display: flex; gap: 3px; }
+    .media-order-tools button { width: 28px; height: 28px; padding: 0; background: #fffF; }
+    .media-order-tools .media-drag-handle { width: auto; min-width: 52px; padding: 0 4px; font-size: 10px; cursor: grab; }
+    .media-order-tools .media-drag-handle:active { cursor: grabbing; }
+    .media-order-tools button:disabled { opacity: .4; cursor: default; }
+    .media-add { display: grid; place-items: center; min-height: 125px; color: #777b78; font-size: 12px; text-align: center; cursor: pointer; }
+    .media-add input { display: none; }
+    .order-table th:nth-child(1), .order-table td:nth-child(1) { width: 16%; }
+    .order-table th:nth-child(2), .order-table td:nth-child(2) { width: 39%; }
+    .order-table th:nth-child(3), .order-table td:nth-child(3) { width: 45%; }
+    .order-table td { min-height: 58px; }
+    .footer-note { display: flex; justify-content: space-between; gap: 12px; color: var(--muted); font-size: 11px; margin-top: 18px; }
+    .toast { position: fixed; right: 22px; bottom: 22px; z-index: 20; transform: translateY(20px); opacity: 0; pointer-events: none; color: #fff; background: #26323d; padding: 10px 13px; border-radius: 8px; box-shadow: 0 8px 25px rgba(0,0,0,.2); transition: .2s; font-size: 12px; }
+    .toast.show { transform: translateY(0); opacity: 1; }
+    @media (max-width: 760px) {
+      .appbar { align-items: flex-start; flex-direction: column; }
+      .status { position: absolute; top: 12px; right: 17px; }
+      .toolbar { width: 100%; }
+      .toolbar { position: relative; gap: 5px; }
+      .toolbar-menu { position: static; }
+      .toolbar-panel { min-width: 0; max-width: 100%; left: 0; right: 0; }
+      .toolbar button, .file-button, .toolbar-menu > summary { padding: 8px 9px; }
+      main { margin-top: 15px; padding: 0 8px; }
+      .paper { padding: 10px; }
+      .title-line input { font-size: 21px; }
+      .media-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+    @page { size: A4 landscape; margin: 4.5mm 5.5mm; }
+    @media print {
+      html, body { background: #fff; color: #111; }
+      dialog { display: none !important; }
+      .appbar, .scene-actions, .row-tools, .drag-handle, .add-shot, .add-order-row, .ref-tools, .media-add, .remove-media, .media-order-tools, .remove-ref, .remove-link, .remove-location-image, .location-tools, .props-suggest, .cam-box button, .footer-note, .toast, .add-location-group, [data-delete-location-group] { display: none !important; }
+      .ref-placeholder, .ref-note:empty, .ref-image-note:empty, .location-image-note:empty, .location-text:empty, .props-text:empty, .cam-note:empty, .cam-detail-value:empty { display: none !important; }
+      [data-free-section]:not(:has(.media-card:not(.media-add), .legacy-tone-note)) { display: none !important; }
+      [data-ref-category]:not(:has(.media-card:not(.media-add))) { display: none !important; }
+      [data-location-group]:not(:has(.media-card:not(.media-add))) { display: none !important; }
+      main { width: 100%; margin: 0; max-width: none; padding: 0; }
+      .paper { border: 0; box-shadow: none; background: #fff; padding: 0; }
+      .title-line { margin: 0 0 1.5mm; }
+      .title-line input { border: 0; padding: 0; font-size: 18px; }
+      .title-line span { display: none; }
+      .scene, .free-section { break-inside: auto; page-break-inside: auto; margin: 1.5mm 0 0; }
+      .scene-head { min-height: 0; padding: 1.2mm 2mm; font-size: 11px; break-after: avoid; }
+      .free-head { padding: 1.2mm 2mm; font-size: 11px; break-after: avoid; }
+      .table-wrap { overflow: visible; }
+      .shot-table, .order-table { width: 100%; min-width: 0; table-layout: fixed; }
+      .shot-table th:nth-child(1), .shot-table td:nth-child(1) { width: 6%; }
+      .shot-table th:nth-child(2), .shot-table td:nth-child(2) { width: 20%; }
+      .shot-table th:nth-child(3), .shot-table td:nth-child(3) { width: 16%; }
+      .shot-table th:nth-child(4), .shot-table td:nth-child(4) { width: 43%; }
+      .shot-table th:nth-child(5), .shot-table td:nth-child(5) { width: 15%; }
+      .props-location-cell .props-cell { padding-bottom: .6mm; margin-bottom: .6mm; }
+      .props-location-cell .location-cell::before { margin-bottom: .4mm; font-size: 9px; }
+      .props-location-cell .location-cell img { max-height: 18mm; }
+      .ref-category-title { padding: 1.2mm 2mm 0; font-size: 10px; }
+      thead { display: table-header-group; }
+      .shot-table tr, .order-table tr, .media-card, .ref-image, .location-image { break-inside: avoid !important; page-break-inside: avoid !important; }
+      th, td { padding: .45mm 1mm; font-size: 10.5px; line-height: 1.08; overflow-wrap: anywhere; }
+      .description-text { min-height: 0; font-size: 10.5px; line-height: 1.08; }
+      .description-text:empty::before { content: none; }
+      .props-location-cell .props-cell:has(.props-text:empty), .props-location-cell .location-cell:not(:has(img)):has(.location-text:empty) { display: none; }
+      .props-text, .ref-image-note, .ref-link-note { min-height: 0; padding: .2mm 0; }
+      td, .ref-cell { min-height: 0; }
+      th { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+      .shot-no { font-size: 11px; }
+      .cam-box { gap: 1mm; }
+      .cam-box select { border: 0; padding: 0; font-size: 10.5px; background: transparent; appearance: none; -webkit-appearance: none; }
+      .cam-size:has(option[value=""]:checked) { display: none !important; }
+      .cam-coverage, .cam-special { border: 0; padding: 0; background: transparent; }
+      .coverage-take { padding-bottom: 1mm; }
+      .coverage-item input { width: 11px; height: 11px; }
+      .coverage-name, .coverage-take-name, .cam-detail-value, .cam-note { font-size: 10.5px; }
+      .cam-detail-value, .cam-note { min-height: 0; padding: 0; border: 0; background: transparent; }
+      .cam-detail { grid-template-columns: 14mm minmax(0, 1fr); column-gap: 1mm; margin-bottom: .5mm; break-inside: avoid; }
+      .cam-detail:has(.cam-detail-value:empty) { display: none !important; }
+      .cam-detail span { font-size: 9px; font-weight: 600; white-space: nowrap; }
+      .cam-cell, .cam-box, .cam-special, .cam-detail { min-width: 0 !important; max-width: 100%; box-sizing: border-box; }
+      .cam-detail { width: 100%; grid-template-columns: 14mm minmax(0, 1fr); }
+      .cam-detail-value { display: block; width: 100%; min-width: 0 !important; max-width: 100%; white-space: pre-wrap !important; overflow-wrap: anywhere !important; word-break: break-word; }
+      .cam-notes summary, .cam-notes:has(.cam-note:empty) { display: none !important; }
+      .ref-note, .location-text { min-height: 0; margin: 1mm 0 0; padding: 0; border: 0; }
+      .ref-cell img, .location-cell img { max-height: 24mm; }
+      .shot-table .ref-cell img { width: auto; max-width: 100%; height: auto; margin: 0 auto; object-fit: contain; }
+      .media-grid { padding: .7mm; gap: .7mm; }
+      .media-card { min-height: 0; border: 0; }
+      .media-card img { height: auto; max-height: 22mm; object-fit: contain; }
+      .ref-category-title { padding: .7mm 1.5mm 0; font-size: 9px; }
+      .location-ref-groups { padding: 0 .7mm .7mm; }
+      .location-ref-group { margin: .7mm 0; break-inside: auto; page-break-inside: auto; }
+      .location-ref-group-head { padding: .7mm 1.5mm; }
+      .location-ref-title { font-size: 9.5px; }
+      [data-ref-category="location"] .media-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+      [data-ref-category="visual"] .media-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+      .media-card .media-caption, .location-image-note { padding: .7mm; font-size: 9px; }
+      .ref-image { margin-bottom: .7mm; }
+      .order-table td { min-height: 0; }
+    }
+  </style>
+</head>
+<body>
+  <header class="appbar">
+    <div class="brand">
+      <strong>Storyboard Editor · v0.32</strong>
+      <small>直接編輯 · 自動保存於此瀏覽器</small>
+    </div>
+    <div class="toolbar">
+      <details class="toolbar-menu"><summary>匯入／備份 ▾</summary><div class="toolbar-panel">
+        <label class="file-button">Import Script · PDF / DOCX / Pages<input id="scriptInput" type="file" accept=".txt,.md,.fountain,.doc,.docx,.pages,.pdf,text/plain,text/markdown,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/pdf,application/vnd.apple.pages" /></label>
+        <button id="pasteScriptBtn" type="button">貼上劇本</button>
+        <label class="file-button">載入工程 · HTML / JSON<input id="restoreInput" type="file" accept=".html,.json,text/html,application/json" /></label>
+        <button id="backupBtn" type="button">匯出工程備份 · JSON</button>
+        <button id="helpBtn" type="button">使用說明／跨裝置使用</button>
+      </div></details>
+      <button id="addSceneBtn" type="button">＋ Scene</button>
+      <details class="toolbar-menu"><summary>編輯／復原 ▾</summary><div class="toolbar-panel">
+        <button id="undoBtn" type="button" disabled>Undo</button>
+        <button id="redoBtn" type="button" disabled>Redo</button>
+        <button id="regenerateBtn" type="button" title="重建分鏡與 Shot Order；保留 Ref，舊分鏡可復原" hidden>用已存劇本重分</button>
+        <button id="undoImportBtn" type="button" hidden>復原匯入前內容</button>
+        <button id="undoSceneBtn" type="button" hidden>撤銷刪 Scene</button>
+        <button id="resetBtn" type="button">建立空白工程…</button>
+      </div></details>
+      <button id="saveBtn" type="button">Save HTML</button>
+      <button id="printBtn" type="button">Print / PDF</button>
+    </div>
+    <div class="status" id="saveStatus">Draft ready</div>
+  </header>
+  <div id="storageNotice" role="status" hidden></div>
+
+  <main>
+    <section class="paper" id="board">
+      <div class="title-line">
+        <input id="projectTitle" value="Storyboard / Shotlist" aria-label="Project title" />
+        <span>直接改字、換圖、加行；不需要逐項確認</span>
+      </div>
+      <div id="importNotice" class="import-notice" role="status" hidden></div>
+
+      <div id="scenes">
+        <section class="scene" data-scene>
+          <div class="scene-head">
+            <div contenteditable="true">【Scene 1】</div>
+            <div class="scene-actions"><button class="icon-button danger" data-delete-scene type="button">刪 Scene</button></div>
+          </div>
+          <div class="table-wrap">
+            <table class="shot-table">
+              <thead><tr><th>No.</th><th>Ref</th><th>Cam</th><th>Description</th><th>Props / Location</th></tr></thead>
+              <tbody>
+                <tr class="shot-row">
+                  <td><div class="shot-no">1</div><div class="row-tools"><button data-move="up" type="button">↑</button><button data-move="down" type="button">↓</button><button data-delete-row type="button">刪</button></div></td>
+                  <td class="ref-cell"></td>
+                  <td contenteditable="true"></td>
+                  <td class="description-cell"><div class="description-text" contenteditable="true"></div></td>
+                  <td class="props-location-cell"><div class="props-cell"><div class="props-text" contenteditable="true"></div></div><div class="location-cell"><div class="location-text" contenteditable="true"></div><div class="location-media"></div></div></td>
+                </tr>
+              </tbody>
+            </table>
+            <button class="add-shot" data-add-shot type="button">＋ 加 Shot</button>
+          </div>
+        </section>
+      </div>
+
+      <section class="free-section" data-order-section>
+        <div class="free-head" contenteditable="true">shot order</div>
+        <div class="table-wrap">
+          <table class="order-table">
+            <thead><tr><th>時間</th><th>拍攝內容</th><th>Shot / Notes</th></tr></thead>
+            <tbody>
+              <tr><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="free-section" data-free-section>
+        <div class="free-head" contenteditable="true">Ref</div>
+        <div class="ref-category" data-ref-category="location">
+          <div class="ref-category-title">看景現場／場景照片</div>
+          <div class="media-grid" data-media-grid>
+            <label class="media-card media-add">＋ 加入現場照片<input type="file" accept="image/*,.heic,.heif" data-media-input /></label>
+          </div>
+        </div>
+        <div class="ref-category" data-ref-category="visual">
+          <div class="ref-category-title">影視構圖／顏色參考</div>
+          <div class="media-grid" data-media-grid>
+            <label class="media-card media-add">＋ 加入影視參考<input type="file" accept="image/*,.heic,.heif" data-media-input /></label>
+          </div>
+        </div>
+      </section>
+
+      <div class="footer-note"><span>提示：點擊文字可編輯；拖動 Shot 或按 ↑ ↓，鏡號會跟隨順序更新。</span><span>Local draft · <span id="lastSaved">尚未保存</span></span></div>
+    </section>
+  </main>
+  <div class="toast" id="toast"></div>
+  <dialog id="pasteDialog">
+    <form method="dialog">
+      <strong>貼上劇本，直接生成可編輯分鏡</strong>
+      <textarea id="pasteText" aria-label="劇本內容" placeholder="貼上場景、動作與對白…"></textarea>
+      <p id="pasteError" role="alert"></p>
+      <button id="generatePasteBtn" type="button">生成分鏡草稿</button><button value="cancel">取消</button>
+    </form>
+  </dialog>
+
+  <dialog id="helpDialog" aria-labelledby="helpTitle">
+    <form method="dialog">
+      <strong id="helpTitle">使用與備份</strong>
+      <p><strong>開始：</strong>匯入 DOCX、文字版 PDF、TXT，或直接貼上劇本。會依本機規則產生可編輯分鏡，目前未接 AI。舊 DOC 請先轉 DOCX；Pages 如沒有內嵌 PDF 預覽，請先在 Pages 匯出 DOCX／PDF。</p>
+      <p><strong>保存：</strong>文字、照片和 Shot Order 自動保存在目前瀏覽器。清除網站資料、無痕模式或更換瀏覽器，都可能無法取回。Cmd／Ctrl + S 可保存完整可編輯 HTML。</p>
+      <p><strong>手機／iPad：</strong>把「工程備份 · JSON」或 Save HTML 放到 iCloud Drive，在另一台裝置開本工具，再用「載入工程」選擇該檔案。照片會一起帶過去；同時修改兩份不會自動合併。</p>
+      <p><strong>打印：</strong>Print / PDF 使用 A4 橫向。請在打印預覽核對頁數、採用 100% 比例，並關閉瀏覽器的頁首／頁尾。</p>
+      <p><strong>資料：</strong>劇本及照片在你的裝置處理，不會上傳至 GitHub。部分格式首次匯入需要連線載入解析套件。</p>
+      <button value="close">知道了</button>
+    </form>
+  </dialog>
+
+  <template id="shotTemplate">
+    <tr class="shot-row" draggable="true">
+      <td><div class="shot-no" contenteditable="true"></div><div class="row-tools"><button data-move="up" type="button">↑</button><button data-move="down" type="button">↓</button><button data-delete-row type="button">刪</button></div></td>
+      <td class="ref-cell"><div class="ref-placeholder">Drop / choose a ref image</div><div class="ref-tools"><label>換圖<input type="file" accept="image/*" data-ref-input /></label></div></td>
+      <td contenteditable="true">CU / Master</td>
+      <td class="description-cell"><div class="description-text" contenteditable="true">在這裡直接寫 action、對白、reaction 或只有自己看得懂的拍攝提示。</div></td>
+      <td class="props-location-cell"><div class="props-cell"><div class="props-text" contenteditable="true"></div></div><div class="location-cell"><div class="location-text" contenteditable="true"></div><div class="location-media"></div></div></td>
+    </tr>
+  </template>
+
+  <!--
+    The import helpers read documents locally; shot suggestions use local rules.
+    No script file is uploaded. Libraries are loaded only when needed.
+  -->
+  <script>
+(() => {
+  'use strict';
+  const $ = (selector) => document.querySelector(selector);
+  const draftId = document.documentElement.dataset.draftId;
+  const STORAGE_KEY = 'storyboard-editor-draft-v1' + (draftId ? '-' + draftId : '');
+  const BACKUP_KEY = STORAGE_KEY + '-before-import';
+  const CACHE_KEY = STORAGE_KEY + '-record-v3';
+  const initialBoard = $('#board').innerHTML;
+  // Restoring a board replaces its children. Always resolve live nodes at use time.
+  const board = () => $('#board');
+  const scenes = () => $('#scenes');
+  const actionUndo = [], actionRedo = [];
+  let editingTarget = null, editingBefore = null, editHistoryTimer = null;
+  const updateHistoryButtons = () => {
+    const undo = $('#undoBtn'), redo = $('#redoBtn');
+    if (undo) undo.disabled = !actionUndo.length;
+    if (redo) redo.disabled = !actionRedo.length;
+  };
+  const recordAction = action => {
+    actionUndo.push(action);
+    if (actionUndo.length > 40) actionUndo.shift();
+    actionRedo.length = 0;
+    updateHistoryButtons();
+  };
+  const isHtmlEditor = target => target.isContentEditable || target.getAttribute('contenteditable') === 'true';
+  const readEditValue = target => isHtmlEditor(target)
+    ? {html: target.innerHTML}
+    : target.type === 'checkbox' ? {checked: target.checked} : {value: target.value};
+  const writeEditValue = (target, state) => {
+    if (!target.isConnected) return;
+    if ('html' in state) target.innerHTML = state.html;
+    else if ('checked' in state) target.checked = state.checked;
+    else target.value = state.value;
+  };
+  const commitEditorEdit = finish => {
+    clearTimeout(editHistoryTimer); editHistoryTimer = null;
+    if (!editingTarget || !editingBefore) return;
+    const target = editingTarget, before = editingBefore, after = readEditValue(target);
+    if (JSON.stringify(before) !== JSON.stringify(after)) {
+      recordAction({label: '文字修改', undo: () => writeEditValue(target, before), redo: () => writeEditValue(target, after)});
+      editingBefore = after;
+    }
+    if (finish) { editingTarget = null; editingBefore = null; }
+  };
+  const clearActionHistory = () => {
+    clearTimeout(editHistoryTimer); editHistoryTimer = null;
+    editingTarget = null; editingBefore = null;
+    actionUndo.length = 0; actionRedo.length = 0;
+    updateHistoryButtons();
+  };
+  const restoreShotNumbers = () => {
+    [...scenes().querySelectorAll('.shot-row')].forEach((row, index) => { row.querySelector('.shot-no').textContent = String(index + 1); });
+  };
+  const readShotOrder = () => [...document.querySelectorAll('.order-table tbody tr td:nth-child(3)')].map(cell => cell.innerHTML);
+  const writeShotOrder = html => {
+    document.querySelectorAll('.order-table tbody tr td:nth-child(3)').forEach((cell, index) => { if (html[index] !== undefined) cell.innerHTML = html[index]; });
+  };
+  const shotRowsIn = parent => [...parent.children].filter(node => node.matches('.shot-row'));
+  const placeShotAt = (parent, row, index) => {
+    const rows = shotRowsIn(parent), target = rows[Math.max(0, Math.min(index, rows.length))];
+    parent.insertBefore(row, target || null);
+  };
+  const removeWithUndo = (node, label, refresh = () => {}) => {
+    if (!node?.parentElement) return;
+    commitEditorEdit(true);
+    const parent = node.parentElement, next = node.nextSibling;
+    node.remove(); refresh();
+    recordAction({
+      label,
+      undo: () => { parent.insertBefore(node, next?.parentNode === parent ? next : null); refresh(); },
+      redo: () => { node.remove(); refresh(); }
+    });
+    void persist();
+  };
+  const undoAction = () => {
+    commitEditorEdit(true);
+    const action = actionUndo.pop(); if (!action) return;
+    try { action.undo(); actionRedo.push(action); updateHistoryButtons(); void persist(); toast('已撤銷：' + action.label); }
+    catch (error) { actionUndo.push(action); updateHistoryButtons(); notice('撤銷失敗：' + error.message, 'error'); }
+  };
+  const redoAction = () => {
+    commitEditorEdit(true);
+    const action = actionRedo.pop(); if (!action) return;
+    try { action.redo(); actionUndo.push(action); updateHistoryButtons(); void persist(); toast('已重做：' + action.label); }
+    catch (error) { actionRedo.push(action); updateHistoryButtons(); notice('重做失敗：' + error.message, 'error'); }
+  };
+  let undoSnapshot = null;
+  let sceneUndoSnapshot = null, sceneUndoRevision = 0;
+  let importRevision = 0;
+  let pdfjsPromise;
+  let saveTimer;
+  let saveRevision = 0, durableRevision = 0, cachedRevision = 0, pendingImages = 0;
+  let lastRecord = null, saveQueue = Promise.resolve();
+  let ready = false;
+  const PDFJS_BASE = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@6.4.299/';
+
+  const toast = (message) => {
+    const node = $('#toast');
+    if (!node) return;
+    node.textContent = message;
+    node.classList.add('show');
+    clearTimeout(toast.timer);
+    toast.timer = setTimeout(() => node.classList.remove('show'), 4500);
+  };
+  const notice = (message, kind = 'info') => {
+    let node = $('#importNotice');
+    if (!node) {
+      node = document.createElement('div');
+      node.id = 'importNotice';
+      node.setAttribute('role', 'status');
+      board().querySelector('.title-line').after(node);
+    }
+    node.hidden = !message;
+    node.className = 'import-notice ' + kind;
+    node.textContent = message;
+  };
+  const snapshot = () => {
+    // Input values are properties; serialize them explicitly before saving HTML.
+    const title = $('#projectTitle');
+    title.setAttribute('value', title.value);
+    document.querySelectorAll('[data-ref-url]').forEach(input => input.setAttribute('value', input.value));
+    document.querySelectorAll('.cam-cell select').forEach(select => {
+      [...select.options].forEach(option => {
+        if (option.value === select.value) option.setAttribute('selected', '');
+        else option.removeAttribute('selected');
+      });
+    });
+    document.querySelectorAll('.coverage-item input[type="checkbox"]').forEach(input => {
+      if (input.checked) input.setAttribute('checked', '');
+      else input.removeAttribute('checked');
+    });
+    return board().innerHTML;
+  };
+  // Photos quickly exceed localStorage's small quota. Store the complete editable
+  // board in IndexedDB; keep a synchronous checkpoint when space allows it.
+  const storageWarning = message => {
+    $('#storageNotice').textContent = message;
+    $('#storageNotice').hidden = !message;
+  };
+  const dbPromise = new Promise(resolve => {
+    if (!window.indexedDB) { resolve(null); return; }
+    let finished = false;
+    const finish = db => { if (!finished) { finished = true; clearTimeout(timer); resolve(db); } else db?.close(); };
+    const timer = setTimeout(() => finish(null), 4000);
+    try {
+      const request = indexedDB.open('storyboard-editor-records', 1);
+      request.onupgradeneeded = () => request.result.createObjectStore('drafts');
+      request.onsuccess = () => {
+        request.result.onversionchange = () => request.result.close();
+        finish(request.result);
+      };
+      request.onerror = request.onblocked = () => finish(null);
+    } catch { finish(null); }
+  });
+  const databaseRecord = async (value) => {
+    const db = await dbPromise;
+    if (!db) throw new Error('IndexedDB unavailable');
+    return new Promise((resolve, reject) => {
+      let tx;
+      try {
+        tx = db.transaction('drafts', value ? 'readwrite' : 'readonly');
+        const request = value ? tx.objectStore('drafts').put(value, STORAGE_KEY) : tx.objectStore('drafts').get(STORAGE_KEY);
+        tx.oncomplete = () => resolve(request.result);
+        tx.onerror = tx.onabort = () => reject(tx.error || new Error('Storage failed'));
+      } catch (error) { reject(error); }
+    });
+  };
+  const persist = () => {
+    clearTimeout(saveTimer);
+    saveTimer = null;
+    if (!ready) return Promise.resolve(false);
+    const html = snapshot();
+    if (lastRecord?.html === html && lastRecord.undoHTML === undoSnapshot && lastRecord.undoSceneHTML === sceneUndoSnapshot) return saveQueue;
+    const revision = ++saveRevision;
+    const record = {html, undoHTML: undoSnapshot, undoSceneHTML: sceneUndoSnapshot, updatedAt: Math.max(Date.now(), (lastRecord?.updatedAt || 0) + 1)};
+    lastRecord = record;
+    $('#saveStatus').textContent = '儲存中…';
+    try {
+      localStorage.setItem(CACHE_KEY, JSON.stringify(record));
+      cachedRevision = revision;
+    } catch { /* The larger IndexedDB record is still saved below. */ }
+    // Serialize transactions: a slower older save must not overwrite newer work.
+    saveQueue = saveQueue.then(async () => {
+      let databaseSaved = false;
+      try { await databaseRecord(record); databaseSaved = true; } catch { /* Report below. */ }
+      const saved = databaseSaved || cachedRevision >= revision;
+      if (saved) durableRevision = Math.max(durableRevision, revision);
+      if (revision === saveRevision && saveTimer === null) {
+        const time = new Date(record.updatedAt).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+        $('#saveStatus').textContent = saved ? '已存本機 ' + time : '未能保存 · 請 Save HTML';
+        storageWarning(!saved ? '瀏覽器未能保存目前修改。請立即用 Save HTML 下載完整備份（含圖片），不要關閉此頁。'
+          : !databaseSaved ? '目前使用容量較小的備用儲存。加入較多圖片後，建議用 Save HTML 備份。' : '');
+        if (!saved) lastRecord = null; // Allow a later save to retry after a quota error.
+      }
+      return saved;
+    });
+    return saveQueue;
+  };
+  const schedulePersist = () => {
+    if (!ready) return;
+    clearTimeout(saveTimer);
+    $('#saveStatus').textContent = '待儲存…';
+    saveTimer = setTimeout(() => { saveTimer = null; void persist(); }, 650);
+  };
+  const flushPersist = () => {
+    clearTimeout(saveTimer);
+    saveTimer = null;
+    return persist();
+  };
+  const editableNote = (className, label) => {
+    const note = document.createElement('div');
+    note.className = className; note.contentEditable = 'true';
+    note.setAttribute('aria-label', label);
+    return note;
+  };
+  const makeCamSelect = (className, label, choices) => {
+    const select = document.createElement('select'); select.className = className;
+    select.setAttribute('aria-label', label);
+    for (const [value, caption] of choices) {
+      const option = document.createElement('option'); option.value = value;
+      option.textContent = caption; select.append(option);
+    }
+    return select;
+  };
+  const addCoverageItem = (take, name = '') => {
+    const item = document.createElement('div'); item.className = 'coverage-item';
+    const checkbox = document.createElement('input'); checkbox.type = 'checkbox';
+    checkbox.setAttribute('aria-label', '這個 coverage 已拍');
+    const title = editableNote('coverage-name', '機位／人物，例如：人物 A MCU');
+    title.textContent = name;
+    const remove = document.createElement('button'); remove.type = 'button';
+    remove.className = 'cam-remove'; remove.dataset.removeCoverage = '';
+    remove.textContent = '×'; remove.setAttribute('aria-label', '刪除此機位');
+    item.append(checkbox, title, remove);
+    take.querySelector('.coverage-items').append(item);
+    return item;
+  };
+  const addCoverageTake = (cell, names = []) => {
+    const list = cell.querySelector('.cam-takes');
+    const take = document.createElement('div'); take.className = 'coverage-take';
+    const head = document.createElement('div'); head.className = 'coverage-take-head';
+    const name = editableNote('coverage-take-name', 'Take 名稱');
+    name.textContent = 'Take ' + (list.children.length + 1);
+    const remove = document.createElement('button'); remove.type = 'button';
+    remove.className = 'cam-remove'; remove.dataset.removeTake = '';
+    remove.textContent = '×'; remove.setAttribute('aria-label', '刪除此 Take');
+    head.append(name, remove);
+    const items = document.createElement('div'); items.className = 'coverage-items';
+    const add = document.createElement('button'); add.type = 'button';
+    add.className = 'cam-add-item'; add.dataset.addCoverage = '';
+    add.textContent = '＋ 機位';
+    take.append(head, items, add); list.append(take);
+    names.forEach(value => addCoverageItem(take, value));
+    return take;
+  };
+  const coverageCast = row => [...new Set([...(row.cells[3].querySelector('.description-text')?.textContent || row.cells[3].textContent).matchAll(/(?:^|\n)\s*([^\n：:△Δ]{1,16})[：:]/g)]
+    .filter(match => !/(?:\(VO\)|（VO）)/i.test(match[1]))
+    .map(match => match[1].replace(/\s+/g, '').trim())
+    .filter(name => name && !/^(?:場景|场景|Location|Scene|VO|地點|地点|短訊|短信)/i.test(name)))];
+  const seedCoverage = (cell, cast = []) => {
+    if (cell.querySelector('.coverage-take')) return;
+    const names = cast.length ? cast : ['人物 A', '人物 B', '人物 C'];
+    addCoverageTake(cell, ['Master', names[0] + ' MCU']);
+    if (names.length > 1) addCoverageTake(cell, names.slice(1).map(name => name + ' MCU'));
+  };
+  const setCamMode = (cell, mode, cast = []) => {
+    const box = cell.querySelector('.cam-box');
+    const select = box.querySelector('.cam-mode');
+    [...select.options].filter(option => !['coverage', 'special'].includes(option.value)).forEach(option => option.remove());
+    for (const [value, label] of [['coverage', '對白 Coverage'], ['special', '特別鏡頭']]) {
+      if (!select.querySelector('option[value="' + value + '"]')) {
+        const option = document.createElement('option'); option.value = value; option.textContent = label; select.append(option);
+      }
+    }
+    mode = mode === 'coverage' ? 'coverage' : 'special';
+    select.value = mode;
+    box.dataset.mode = mode;
+    box.querySelector('.cam-coverage').hidden = mode !== 'coverage';
+    const special = cell.closest('.shot-row')?.querySelector('.cam-special') || box.querySelector('.cam-special');
+    if (special) special.hidden = mode !== 'special';
+    const notes = box.querySelector('.cam-notes');
+    if (notes) notes.open = !!notes.querySelector('.cam-note')?.textContent.trim();
+    if (mode === 'coverage') seedCoverage(cell, cast.length ? cast : coverageCast(cell.closest('.shot-row')));
+  };
+  const upgradeCamCell = cell => {
+    cell.classList.add('cam-cell');
+    const existing = cell.querySelector(':scope > .cam-box');
+    if (existing) {
+      const mode = existing.querySelector('.cam-mode');
+      if (mode && existing.firstElementChild !== mode) existing.prepend(mode);
+      let notes = existing.querySelector(':scope > .cam-notes');
+      if (!notes) {
+        notes = document.createElement('details'); notes.className = 'cam-notes';
+        const summary = document.createElement('summary'); summary.textContent = 'Cam 備註';
+        const note = existing.querySelector(':scope > .cam-note');
+        notes.append(summary);
+        if (note) notes.append(note);
+        existing.append(notes);
+      }
+      if (mode) setCamMode(cell, mode.value);
+      return;
+    }
+    const note = editableNote('cam-note', '其他 Cam 備註');
+    while (cell.firstChild) note.append(cell.firstChild);
+    cell.removeAttribute('contenteditable');
+    const box = document.createElement('div'); box.className = 'cam-box';
+    const size = makeCamSelect('cam-size', '景別', [
+      ['', '景別…'], ['EWS', 'EWS 大遠景'], ['WS', 'WS 遠景'],
+      ['FS', 'FS 全景'], ['MLS', 'MLS 中遠景'], ['MS', 'MS 中景'],
+      ['MCU', 'MCU 中近景'], ['CU', 'CU 特寫'], ['ECU', 'ECU 大特寫']
+    ]);
+    const mode = makeCamSelect('cam-mode', '拍攝方式', [
+      ['coverage', '對白 Coverage'], ['special', '特別鏡頭']
+    ]);
+    const coverage = document.createElement('div'); coverage.className = 'cam-coverage'; coverage.hidden = true;
+    const hint = document.createElement('div'); hint.className = 'cam-hint';
+    hint.textContent = '同段對白 · 按 Take 記機位，勾選已拍';
+    const takes = document.createElement('div'); takes.className = 'cam-takes';
+    const addTake = document.createElement('button'); addTake.type = 'button';
+    addTake.className = 'cam-add-take'; addTake.dataset.addTake = '';
+    addTake.textContent = '＋ Take'; coverage.append(hint, takes, addTake);
+    const special = document.createElement('div'); special.className = 'cam-special'; special.hidden = true;
+    for (const [field, label] of [['movement', 'Movement'], ['angle', 'Angle'], ['light', '打光／效果']]) {
+      const line = document.createElement('div'); line.className = 'cam-detail';
+      const title = document.createElement('span'); title.textContent = label;
+      const value = editableNote('cam-detail-value', label); value.dataset.camField = field;
+      line.append(title, value); special.append(line);
+    }
+    const notes = document.createElement('details'); notes.className = 'cam-notes';
+    const summary = document.createElement('summary'); summary.textContent = 'Cam 備註';
+    notes.append(summary, note);
+    box.append(mode, size, coverage, special, notes); cell.append(box);
+    setCamMode(cell, 'free');
+  };
+  const upgradeLocationCell = cell => {
+    cell.classList.add('location-cell');
+    let text = cell.querySelector(':scope > .location-text');
+    if (!text) {
+      text = editableNote('location-text', '地點文字');
+      while (cell.firstChild) text.append(cell.firstChild);
+      cell.append(text);
+    }
+    cell.removeAttribute('contenteditable'); text.contentEditable = 'true';
+    let media = cell.querySelector(':scope > .location-media');
+    if (!media) { media = document.createElement('div'); media.className = 'location-media'; cell.append(media); }
+    text.querySelectorAll('img').forEach(img => {
+      const card = document.createElement('div'); card.className = 'location-image';
+      media.append(card); card.append(img);
+    });
+    media.querySelectorAll('img').forEach(img => {
+      img.draggable = false;
+      let card = img.closest('.location-image');
+      if (!card) { card = document.createElement('div'); card.className = 'location-image'; img.before(card); card.append(img); }
+      if (!card.querySelector('.remove-location-image')) {
+        const button = document.createElement('button'); button.type = 'button';
+        button.className = 'icon-button remove-location-image'; button.textContent = '×';
+        button.setAttribute('aria-label', '刪除此張地點圖片'); card.append(button);
+      }
+      if (!card.querySelector('.location-image-note')) card.append(editableNote('location-image-note', '這張地點圖片的備註'));
+    });
+    let tools = cell.querySelector(':scope > .location-tools');
+    if (!tools) {
+      tools = document.createElement('div'); tools.className = 'location-tools';
+      const label = document.createElement('label'); label.textContent = '＋ 地點圖片';
+      const input = document.createElement('input'); input.type = 'file'; input.accept = 'image/*,.heic,.heif';
+      input.multiple = true; input.dataset.locationInput = '';
+      label.append(input); tools.append(label); cell.append(tools);
+    }
+    cell.querySelectorAll('[data-location-input]').forEach(input => { input.accept = 'image/*,.heic,.heif'; });
+  };
+  const upgradeDescriptionCell = cell => {
+    cell.classList.add('description-cell');
+    let text = cell.querySelector(':scope > .description-text');
+    if (!text) {
+      text = editableNote('description-text', 'Description');
+      [...cell.childNodes].filter(node => !node.matches?.('.cam-special')).forEach(node => text.append(node));
+      cell.prepend(text);
+    }
+    cell.removeAttribute('contenteditable'); text.contentEditable = 'true';
+  };
+  const upgradePropsCell = cell => {
+    cell.classList.add('props-cell');
+    let text = cell.querySelector(':scope > .props-text');
+    if (!text) {
+      text = editableNote('props-text', '道具和服化備註');
+      while (cell.firstChild) text.append(cell.firstChild);
+      cell.append(text);
+    }
+    cell.removeAttribute('contenteditable'); text.contentEditable = 'true';
+    if (!cell.querySelector('.props-suggest')) {
+      const button = document.createElement('button'); button.type = 'button';
+      button.className = 'props-suggest'; button.textContent = '從描述補道具';
+      button.title = '只補上 Description 中辨認到的道具，不覆蓋手寫內容';
+      cell.append(button);
+    }
+  };
+  const upgradeRefCell = cell => {
+    let input = cell.querySelector('[data-ref-input]');
+    if (!input) {
+      let tools = cell.querySelector('.ref-tools');
+      if (!tools) { tools = document.createElement('div'); tools.className = 'ref-tools'; cell.append(tools); }
+      const label = document.createElement('label');
+      input = document.createElement('input'); input.type = 'file'; input.dataset.refInput = '';
+      label.append(input); tools.append(label);
+    }
+    if (input) {
+      input.multiple = true; input.accept = 'image/*,.heic,.heif';
+      const label = input.closest('label');
+      if (label) label.replaceChildren(document.createTextNode('＋ 加入圖片'), input);
+    }
+    // Older drafts stored a bare image. Wrap it without replacing its data.
+    cell.querySelectorAll('img').forEach(img => {
+      img.draggable = false;
+      let card = img.closest('.ref-image');
+      if (!card) {
+        card = document.createElement('div'); card.className = 'ref-image';
+        img.before(card); card.append(img);
+      }
+      if (!card.querySelector('.remove-ref')) {
+        const button = document.createElement('button');
+        button.type = 'button'; button.className = 'icon-button remove-ref';
+        button.textContent = '×'; button.setAttribute('aria-label', '刪除此張 reference 圖');
+        card.append(button);
+      }
+      if (!card.querySelector('.ref-image-note')) card.append(editableNote('ref-image-note', '這張 reference 圖片的備註'));
+    });
+    const images = cell.querySelectorAll('img');
+    if (images.length) cell.querySelectorAll('.ref-placeholder').forEach(node => node.remove());
+    else {
+      let placeholder = cell.querySelector('.ref-placeholder');
+      if (!placeholder) { placeholder = document.createElement('div'); placeholder.className = 'ref-placeholder'; cell.prepend(placeholder); }
+      placeholder.textContent = '拖入／選擇圖片（可多張，不覆蓋）';
+    }
+    let links = cell.querySelector(':scope > .ref-links');
+    if (!links) { links = document.createElement('div'); links.className = 'ref-links'; cell.append(links); }
+    // Older drafts may contain links. Keep those cards, but remove the unused
+    // add-link controls from every Ref cell, including restored HTML drafts.
+    cell.querySelectorAll(':scope > .ref-url-tools').forEach(node => node.remove());
+    if (!cell.querySelector(':scope > .ref-note')) cell.append(editableNote('ref-note', '這個 Shot 的 Ref 備註'));
+  };
+  const upgradeRefSections = () => {
+    const section = [...document.querySelectorAll('[data-free-section]')]
+      .find(node => node.querySelector('[data-media-grid]'));
+    if (!section) return;
+    const heading = section.querySelector('.free-head');
+    if (heading && /^Set ref$/i.test(heading.textContent.trim())) heading.textContent = 'Ref';
+    const labels = {location: ['看景現場／場景照片', '＋ 加入現場照片'], visual: ['影視構圖／顏色參考', '＋ 加入影視參考']};
+    const category = kind => {
+      let group = section.querySelector('[data-ref-category="' + kind + '"]');
+      if (group) return group;
+      group = document.createElement('div'); group.className = 'ref-category';
+      group.dataset.refCategory = kind;
+      const title = document.createElement('div'); title.className = 'ref-category-title';
+      title.textContent = labels[kind][0];
+      const grid = document.createElement('div'); grid.className = 'media-grid'; grid.dataset.mediaGrid = '';
+      const add = document.createElement('label'); add.className = 'media-card media-add';
+      add.textContent = labels[kind][1];
+      const input = document.createElement('input'); input.type = 'file';
+      input.accept = 'image/*,.heic,.heif'; input.multiple = true; input.dataset.mediaInput = '';
+      add.append(input); grid.append(add); group.append(title, grid);
+      const legacyNote = section.querySelector('.legacy-tone-note');
+      if (legacyNote) legacyNote.before(group); else section.append(group);
+      return group;
+    };
+    const oldGrid = section.querySelector(':scope > .media-grid');
+    if (oldGrid) {
+      const cards = [...oldGrid.querySelectorAll(':scope > .media-card:not(.media-add)')].map(card => {
+        let next = card.nextElementSibling;
+        while (next && !next.matches('.media-add')) next = next.nextElementSibling;
+        return [card, /場景照片|現場/i.test(next?.textContent || '') ? 'location' : 'visual'];
+      });
+      for (const [card, kind] of cards) category(kind).querySelector('.media-add').before(card);
+      oldGrid.previousElementSibling?.matches('.drop-hint') && oldGrid.previousElementSibling.remove();
+      oldGrid.remove();
+    }
+    for (const kind of ['location', 'visual']) category(kind);
+    upgradeLocationRefGroups(section.querySelector('[data-ref-category="location"]'));
+  };
+  const createLocationRefGroup = (container, existingGrid) => {
+    const group = document.createElement('div'); group.className = 'location-ref-group'; group.dataset.locationGroup = '';
+    const head = document.createElement('div'); head.className = 'location-ref-group-head';
+    const title = document.createElement('div'); title.className = 'location-ref-title'; title.contentEditable = 'true';
+    title.setAttribute('aria-label', '看景地點或 Scene 名稱');
+    const remove = document.createElement('button'); remove.type = 'button'; remove.dataset.deleteLocationGroup = ''; remove.textContent = '刪除此組';
+    head.append(title, remove); group.append(head);
+    const grid = existingGrid || document.createElement('div');
+    grid.classList.add('media-grid'); grid.dataset.mediaGrid = '';
+    if (!grid.querySelector('.media-add')) {
+      const add = document.createElement('label'); add.className = 'media-card media-add'; add.textContent = '＋ 加入現場照片';
+      const input = document.createElement('input'); input.type = 'file'; input.accept = 'image/*,.heic,.heif'; input.multiple = true; input.dataset.mediaInput = '';
+      add.append(input); grid.append(add);
+    }
+    group.append(grid);
+    const addGroup = container.querySelector(':scope > [data-add-location-group]');
+    addGroup ? container.insertBefore(group, addGroup) : container.append(group);
+    return group;
+  };
+  const upgradeLocationRefGroups = category => {
+    if (!category) return;
+    let container = category.querySelector(':scope > [data-location-groups]');
+    const oldGrid = category.querySelector(':scope > [data-media-grid]');
+    if (!container) {
+      container = document.createElement('div'); container.className = 'location-ref-groups'; container.dataset.locationGroups = '';
+      category.append(container);
+    }
+    if (oldGrid) createLocationRefGroup(container, oldGrid);
+    if (!container.querySelector(':scope > [data-location-group]')) createLocationRefGroup(container);
+    let addGroup = container.querySelector(':scope > [data-add-location-group]');
+    if (!addGroup) {
+      addGroup = document.createElement('button'); addGroup.type = 'button'; addGroup.className = 'add-location-group';
+      addGroup.dataset.addLocationGroup = ''; addGroup.textContent = '＋ 新增看景地點／Scene'; container.append(addGroup);
+    }
+  };
+  const mediaCards = grid => [...grid.children].filter(node => node.matches('.media-card:not(.media-add)'));
+  const upgradeMediaGrid = grid => {
+    const cards = mediaCards(grid);
+    cards.forEach((card, index) => {
+      let tools = card.querySelector(':scope > .media-order-tools');
+      if (!tools) {
+        tools = document.createElement('div'); tools.className = 'media-order-tools';
+        card.append(tools);
+      }
+      if (!tools.querySelector('.media-drag-handle')) {
+        const handle = document.createElement('button'); handle.type = 'button'; handle.className = 'icon-button media-drag-handle'; handle.textContent = '⠿ 拖動'; tools.prepend(handle);
+      }
+      if (!tools.querySelector('.move-media-up')) {
+        const up = document.createElement('button'); up.type = 'button'; up.className = 'icon-button move-media-up'; up.textContent = '↑'; tools.append(up);
+      }
+      if (!tools.querySelector('.move-media-down')) {
+        const down = document.createElement('button'); down.type = 'button'; down.className = 'icon-button move-media-down'; down.textContent = '↓'; tools.append(down);
+      }
+      const handle = tools.querySelector('.media-drag-handle');
+      if (handle) { handle.draggable = true; handle.title = '拖動圖片到新位置'; handle.setAttribute('aria-label', '拖動圖片到新位置'); }
+      const up = tools.querySelector('.move-media-up'), down = tools.querySelector('.move-media-down');
+      if (up) { up.disabled = index === 0; up.title = '圖片移前'; up.setAttribute('aria-label', '圖片移前'); }
+      if (down) { down.disabled = index === cards.length - 1; down.title = '圖片移後'; down.setAttribute('aria-label', '圖片移後'); }
+    });
+  };
+  const upgradeBoard = () => {
+    document.querySelectorAll('[data-order-section]').forEach(section => {
+      if (section.querySelector('[data-add-order-row]')) return;
+      const tableWrap = section.querySelector('.table-wrap');
+      if (!tableWrap?.querySelector('.order-table tbody')) return;
+      const button = document.createElement('button');
+      button.type = 'button'; button.className = 'add-order-row';
+      button.dataset.addOrderRow = ''; button.textContent = '＋ 新增一行';
+      tableWrap.after(button);
+    });
+    document.querySelectorAll('[data-scene]').forEach(scene => {
+      const actions = scene.querySelector('.scene-actions');
+      if (actions && !actions.querySelector('[data-add-shot]')) {
+        const button = document.createElement('button');
+        button.type = 'button'; button.className = 'icon-button';
+        button.dataset.addShot = ''; button.textContent = '＋ Shot';
+        button.title = '在此 Scene 最後新增 Shot';
+        actions.prepend(button);
+      }
+    });
+    document.querySelectorAll('.shot-row').forEach(upgradeShotRow);
+    document.querySelectorAll('.ref-cell').forEach(upgradeRefCell);
+    document.querySelectorAll('.shot-table').forEach(table => {
+      const header = table.tHead?.rows[0];
+      if (header?.cells.length === 6) { header.cells[4].textContent = 'Props / Location'; header.deleteCell(5); }
+    });
+    document.querySelectorAll('.shot-row').forEach(row => {
+      upgradeCamCell(row.cells[2]);
+      upgradeDescriptionCell(row.cells[3]);
+      const special = row.querySelector('.cam-special');
+      const camBox = row.cells[2].querySelector('.cam-box');
+      const notes = camBox?.querySelector(':scope > .cam-notes');
+      if (special && camBox && !camBox.contains(special)) camBox.insertBefore(special, notes || null);
+      setCamMode(row.cells[2], row.cells[2].querySelector('.cam-mode').value);
+      upgradePropsLocationRow(row);
+      upgradePropsCell(row.cells[4].querySelector('.props-cell'));
+      upgradeLocationCell(row.cells[4].querySelector('.location-cell'));
+    });
+    document.querySelectorAll('[data-free-section]').forEach(section => {
+      if (!/^影[調调]$/.test(section.querySelector('.free-head')?.textContent.trim() || '')) return;
+      const oldNote = section.querySelector('.free-body');
+      const defaultNote = '這裡可以直接放畫面風格、光線方向、色調、reference 來源，或者任何只有自己看得懂的拍攝提醒。';
+      if (oldNote && (oldNote.textContent.trim() !== defaultNote || oldNote.querySelector('img,a'))) {
+        const setRef = [...document.querySelectorAll('[data-free-section]')].find(node => /^(?:Set ref|Ref)$/i.test(node.querySelector('.free-head')?.textContent.trim() || ''));
+        if (setRef) {
+          const box = document.createElement('div'); box.className = 'legacy-tone-note';
+          const heading = document.createElement('div'); heading.textContent = '原影調備註';
+          const body = editableNote('legacy-tone-body', '原影調備註');
+          while (oldNote.firstChild) body.append(oldNote.firstChild);
+          box.append(heading, body); setRef.append(box);
+        }
+      }
+      section.remove();
+    });
+    upgradeRefSections();
+    document.querySelectorAll('[data-media-grid]').forEach(upgradeMediaGrid);
+    document.querySelectorAll('[data-media-input]').forEach(input => { input.multiple = true; input.accept = 'image/*,.heic,.heif'; });
+    document.querySelectorAll('[data-media-grid]').forEach(grid => {
+      const isLocation = !!grid.closest('[data-ref-category="location"]');
+      const locationTitle = grid.closest('[data-location-group]')?.querySelector('.location-ref-title')?.textContent.trim();
+      const name = isLocation ? '看景現場／場景照片' + (locationTitle ? '：' + locationTitle : '') : '影視構圖／顏色參考';
+      grid.setAttribute('aria-label', name + '：拖入圖片，或點擊加入照片');
+      if (!grid.previousElementSibling?.matches('.drop-hint')) {
+        const hint = document.createElement('p'); hint.className = 'drop-hint';
+        hint.textContent = isLocation ? '把照片拖到這個地點，或點下方加入（可多張）' : '把圖片拖到這一行（可多張），或點下方選擇照片'; grid.before(hint);
+      }
+    });
+    const orderSection = board().querySelector('[data-order-section]');
+    const refSection = board().querySelector('[data-free-section]');
+    if (orderSection && refSection && orderSection.nextElementSibling !== refSection) refSection.before(orderSection);
+    const footer = $('.footer-note');
+    if (footer) footer.innerHTML = '<span>直接改字；拖動 Shot 請抓鏡號下方的「拖動」。</span><span>資料只存於此瀏覽器 · 用 HTML／工程備份帶到其他裝置</span>';
+  };
+  const restoreBoard = (html) => {
+    clearActionHistory();
+    board().innerHTML = html;
+    upgradeBoard();
+    notice('');
+    if (ready) queueMicrotask(() => { void repairLegacyHeicImages(); });
+  };
+  const clearSceneUndo = () => { sceneUndoSnapshot = null; $('#undoSceneBtn').hidden = true; };
+  const rememberBoard = () => {
+    undoSnapshot = snapshot();
+    $('#undoImportBtn').hidden = false;
+  };
+  const withTimeout = (promise, ms, message) => {
+    let timer;
+    return Promise.race([
+      promise,
+      new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(message)), ms); })
+    ]).finally(() => clearTimeout(timer));
+  };
+
+  const libraryPromises = new Map();
+  const loadClassic = (name, url) => {
+    if (window[name]) return Promise.resolve(window[name]);
+    if (!libraryPromises.has(name)) {
+      const promise = new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = url;
+        script.dataset.importLibrary = '';
+        script.onload = () => window[name] ? resolve(window[name]) : reject(new Error('解析器未能啟動。'));
+        script.onerror = () => reject(new Error('解析器下載失敗，請檢查網絡後再匯入。'));
+        document.head.appendChild(script);
+      });
+      libraryPromises.set(name, withTimeout(promise, 25000, '解析器下載逾時，請重試。').catch(error => {
+        libraryPromises.delete(name);
+        throw error;
+      }));
+    }
+    return libraryPromises.get(name);
+  };
+  const loadPdf = () => {
+    if (!pdfjsPromise) {
+      pdfjsPromise = withTimeout(import(PDFJS_BASE + 'legacy/build/pdf.min.mjs'), 25000, 'PDF 解析器下載逾時。')
+        .then(lib => {
+          lib.GlobalWorkerOptions.workerSrc = PDFJS_BASE + 'legacy/build/pdf.worker.min.mjs';
+          return lib;
+        }).catch(error => { pdfjsPromise = null; throw error; });
+    }
+    return pdfjsPromise;
+  };
+  // PDF items are fragments, not paragraphs. Preserve lines by their baselines.
+  const pdfLines = (items) => {
+    const lines = [];
+    let text = '', last = null;
+    const flush = () => { if (text.trim()) lines.push(text.trim()); text = ''; last = null; };
+    for (const item of items) {
+      if (typeof item.str !== 'string') continue;
+      const x = item.transform?.[4] || 0;
+      const y = item.transform?.[5] || 0;
+      const height = Math.abs(item.height || item.transform?.[3] || 10);
+      if (last && Math.abs(y - last.y) > Math.max(2, height * 0.35)) flush();
+      if (last && text && item.str && !/\s$/.test(text) && !/^\s/.test(item.str)) {
+        const gap = x - last.end;
+        if (gap > height * 0.25 || (gap > height * 0.04 && /[a-z0-9]$/i.test(text) && /^[a-z0-9]/i.test(item.str))) text += ' ';
+      }
+      text += item.str;
+      last = {y, end: x + (item.width || 0)};
+      if (item.hasEOL) flush();
+    }
+    flush();
+    return lines.join('\n');
+  };
+  const readPdf = async (file, progress) => {
+    const lib = await loadPdf();
+    const task = lib.getDocument({
+      data: new Uint8Array(await file.arrayBuffer()),
+      cMapUrl: PDFJS_BASE + 'cmaps/', cMapPacked: true,
+      standardFontDataUrl: PDFJS_BASE + 'standard_fonts/', isEvalSupported: false
+    });
+    try {
+      const pdf = await task.promise;
+      const pages = [], blankPages = [];
+      for (let n = 1; n <= pdf.numPages; n++) {
+        progress('正在讀取 PDF：' + n + ' / ' + pdf.numPages + ' 頁…');
+        const page = await pdf.getPage(n);
+        const text = pdfLines((await page.getTextContent()).items);
+        if (!text.trim()) blankPages.push(n);
+        pages.push(text);
+        page.cleanup();
+      }
+      if (!pages.some(text => text.trim())) throw new Error('PDF 沒有文字層（可能是掃描圖片），請匯出文字版 PDF / DOCX，或貼上劇本文字。');
+      return {text: pages.join('\n\n'), warning: blankPages.length ? '第 ' + blankPages.join('、') + ' 頁未讀到文字，請核對原檔。' : ''};
+    } finally {
+      await task.destroy();
+    }
+  };
+  const readDocx = async file => {
+    const lib = await loadClassic('mammoth', 'https://unpkg.com/mammoth@1.13.0/mammoth.browser.min.js');
+    const result = await lib.extractRawText({arrayBuffer: await file.arrayBuffer()});
+    return {text: result.value, warning: result.messages.length ? '文件有部分格式無法解析，請核對下方保留的原文。' : ''};
+  };
+  const readPages = async (file, progress) => {
+    const zipLib = await loadClassic('JSZip', 'https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js');
+    let zip;
+    try { zip = await zipLib.loadAsync(await file.arrayBuffer()); }
+    catch { throw new Error('未能讀取 Pages 封裝；請在 Pages 匯出為 DOCX 或 PDF。'); }
+    const preview = Object.values(zip.files).find(entry => !entry.dir && /(?:^|\/)(?:QuickLook\/Preview|preview)\.pdf$/i.test(entry.name));
+    if (!preview) throw new Error('此 Pages 檔案沒有可讀取的 PDF 預覽，請在 Pages 匯出為 DOCX / PDF，或直接貼上劇本。');
+    return readPdf(new Blob([await preview.async('uint8array')]), progress);
+  };
+  const extractText = async (file, progress) => {
+    const ext = file.name.toLowerCase().split('.').pop();
+    if (['txt', 'md', 'fountain'].includes(ext)) return {text: await file.text(), warning: ''};
+    if (ext === 'pdf') return readPdf(file, progress);
+    if (ext === 'docx') return readDocx(file);
+    if (ext === 'pages') return readPages(file, progress);
+    if (ext === 'doc') {
+      const bytes = new Uint8Array(await file.slice(0, 2).arrayBuffer());
+      if (bytes[0] === 80 && bytes[1] === 75) return readDocx(file);
+      throw new Error('舊版 DOC 尚不能直接解析。請另存為 DOCX / PDF，或使用「貼上劇本」。');
+    }
+    throw new Error('請選擇 DOCX、文字版 PDF 或純文字劇本。');
+  };
+
+  // Lightweight offline shot suggestions. This is rule-based, not an AI model.
+  const propsVocabulary = ['電話號碼紙條','紙條','名牌','員工證','假牙','文件','信封','手機','電話','手袋','健騎機','鑰匙','鎖匙','杯子','水杯','酒杯','相片','照片','手槍','錢包','筆','紙',
+    '包裹','快遞單','银行卡','銀行卡','電腦','电脑','耳機','耳机','badge','phone','letter','envelope','keys','glass','wallet'];
+  const propsIn = text => propsVocabulary.filter((word, i, all) => {
+    const found = /^[a-z]+$/.test(word) ? new RegExp('\\b' + word + '\\b','i').test(text) : text.includes(word);
+    return found && !all.slice(0, i).some(long => long.includes(word) && text.includes(long));
+  });
+  const heading = line => {
+    const clean = line.trim().replace(/^#{1,6}\s*/, '');
+    const title = clean.replace(/^[【\[]|[】\]]$/g, '');
+    return /^(?:(?:場景|场景|場|场|Scene|SC\.?)\s*[\dA-Z一二三四五六七八九十百零〇]+(?:[.\s：:、\-—]|$)|第[一二三四五六七八九十\d]+[場场]|(?:INT\.?|EXT\.?|INT\.?\/EXT\.?|I\/E\.?)\s)/i.test(title) ? title : null;
+  };
+  const speakerLine = line => {
+    const match = line.match(/^([^：:\n]{1,30})[：:]\s*(.*)$/);
+    if (!match || /^(?:地點|地点|時間|时间|人物|角色|道具|場景|场景|鏡頭|镜头|打燈|打光|Location|Time|Props|Scene|Shot|Insert|Focus|Camera|CU|MS|備註|备注)$/i.test(match[1].trim())) return null;
+    const label = match[1].trim();
+    const audio = /(?:\bV\.?O\.?\b|旁白|畫外音|画外音)/i.test(label);
+    const name = label.replace(/[（(].*?[）)]/g, '').replace(/\s*(?:V\.?O\.?|O\.?S\.?)$/i, '').trim();
+    if (/^[△Δ◎]/.test(label)) return null;
+    return {name: name || label, audio, label};
+  };
+  const movementIn = text => {
+    if (/(?:tilt\s*up|仰移|向上搖|向上摇)/i.test(text)) return 'Tilt up';
+    if (/(?:shift\s*focus|rack\s*focus|轉焦|转焦)/i.test(text)) return 'Shift focus';
+    if (/(?:pull\s*(?:out|back)|拉遠|拉远)/i.test(text)) return 'Pull out';
+    if (/(?:push\s*in|推近)/i.test(text)) return 'Push in';
+    if (/(?:環繞|环绕|orbit|rotate)/i.test(text)) return '環繞';
+    if (/(?:跟拍|跟隨|跟随|tracking)/i.test(text)) return '跟拍';
+    return '';
+  };
+  const roughBlocks = lines => {
+    const blocks = [];
+    let block = null;
+    const flush = () => { if (block?.text.trim()) blocks.push(block); block = null; };
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (!line) { flush(); continue; }
+      const speaker = speakerLine(line);
+      const fountainName = /^[A-Z][A-Z .'-]{1,26}(?:\s*\((?:V\.O\.|O\.S\.)\))?$/.test(line)
+        && !/^(?:FADE|CUT|DISSOLVE|THE END|TITLE)/.test(line) && lines[i+1]?.trim();
+      const chineseName = /^[\u3400-\u9fff]{2,4}$/.test(line) && lines[i+1]?.trim()
+        && !/^(?:翌日|稍後|稍后|同時|同时|黑場|黑场|日內|夜內|日外|夜外)$/.test(line);
+      if (speaker || fountainName || chineseName) {
+        flush();
+        block = {kind: (speaker?.audio ? 'audio' : 'dialogue'), name: speaker?.name || line, text: line};
+      } else if (/^[△Δ◎]|^[（(].*[）)]$/.test(line)) {
+        if (block?.kind === 'dialogue' && /^[（(]/.test(line)) block.text += '\n' + line;
+        else { flush(); block = {kind: 'action', text: line, name: ''}; }
+      } else {
+        if (!block) block = {kind: 'action', text: '', name: ''};
+        block.text += (block.text ? '\n' : '') + line;
+      }
+    }
+    flush();
+    return blocks;
+  };
+  const partitionScenes = text => {
+    const result = [];
+    let current = {title: 'Scene 1', lines: []};
+    let beforeFlashback = null;
+    const occupied = () => current.lines.some(line => line.trim());
+    const changeScene = next => { if (occupied()) result.push(current); current = next; };
+    // A delta can follow dialogue in the same paragraph. It starts an action,
+    // but the untouched import is separately retained in script-source.
+    for (const line of text.replace(/([^\n])(?=[Δ△◎])/g, '$1\n').split('\n')) {
+      const title = heading(line);
+      if (title) {
+        if (occupied() || current.explicit) result.push(current);
+        current = {title, lines: [], explicit: true};
+        beforeFlashback = null;
+        continue;
+      }
+      const action = /^[Δ△◎]/.test(line.trim());
+      if (action) {
+        const outdoor = /(?:街上|街頭|街头|街道|馬路|马路|路邊|路边|室外|戶外|户外|公園|公园)/.exec(line)?.[0];
+        const memory = /回憶|回忆|閃回|闪回|腦中閃現|脑中闪现/.test(line);
+        const returning = /回到現實|回到现实|返回現實|回憶結束|回忆结束|閃回結束|闪回结束/.test(line);
+        if (returning && beforeFlashback) {
+          changeScene({...beforeFlashback, title: beforeFlashback.title + '（回到現實）', lines: []});
+          beforeFlashback = null;
+        } else if (outdoor && !returning) {
+          const alreadyOutside = current.outdoor || /室外|戶外|户外|街上|街頭|街头|街道|公園|公园|^EXT\b/i.test(current.title);
+          if (!alreadyOutside) {
+            if (memory) beforeFlashback = {...current, lines: []};
+            const place = /公園|公园/.test(outdoor) ? '公園' : /街|路/.test(outdoor) ? '街上' : '室外';
+            changeScene({title: '室外｜' + place + (memory ? '回憶' : ''), lines: [], outdoor: true, inferredLocation: place});
+          }
+          // Keep nested park inserts in the same exterior shooting scene.
+          if (memory && /公園|公园/.test(outdoor) && !/公園/.test(current.title)) {
+            current.title += '（含公園閃回）';
+            current.inferredLocation = (current.inferredLocation || '室外') + '／公園閃回';
+          }
+        } else if (current.outdoor && /(?:走進|走进|進入|进入|回到|轉到|转到|切至).{0,10}(?:室內|室内|辦公室|办公室|銀行|银行|家中|房間|房间)/.test(line)) {
+          const place = line.match(/室內|室内|辦公室|办公室|銀行|银行|家中|房間|房间/)[0];
+          changeScene({title: place, lines: [], inferredLocation: place});
+          beforeFlashback = null;
+        }
+      }
+      current.lines.push(line);
+    }
+    if (occupied() || current.explicit) result.push(current);
+    return result;
+  };
+  const buildDraft = (source) => {
+    const text = String(source).replace(/\r\n?/g, '\n').replace(/\u0000/g, '').replace(/\uFEFF/g, '');
+    if (!text.trim()) throw new Error('沒有讀到劇本文字。原有內容已保留。');
+    if (text.length > 400000) throw new Error('劇本較長，請按集數分開匯入（每次最多 40 萬字元）。');
+    const sceneList = partitionScenes(text);
+    let number = 1;
+    for (const scene of sceneList) {
+      const blocks = roughBlocks(scene.lines);
+      const locationLine = scene.lines.find(line => /^(?:地點|地点|Location)\s*[：:]/i.test(line));
+      const matchLocation = scene.title.match(/^(?:場景|场景|場|场|Scene|SC\.?)\s*[\dA-Z一二三四五六七八九十百零〇]+\s*[：:、.\-—]\s*(.+)$/i)
+        || scene.title.match(/^(?:INT\.?|EXT\.?|INT\.?\/EXT\.?)\s+(.+?)(?:\s*[-–—]\s*(?:DAY|NIGHT))?$/i);
+      const location = scene.inferredLocation || (locationLine ? locationLine.replace(/^[^：:]+[：:]\s*/, '') : matchLocation?.[1] || '');
+      const cast = [...new Set(blocks.filter(b => b.kind === 'dialogue').map(b => b.name))];
+      const shots = [];
+      const add = (cam, description, options = {}) => shots.push({number: number++, cam, description, props: propsIn(description).join('、'), location, ...options});
+      // A master retains all source lines. Additional coverage references exact original blocks.
+      // Split long coverage into readable blocks without dropping any source text.
+      let master = '';
+      for (const line of scene.lines) {
+        if (master.length > 1600 && line.trim()) { add('', master.trim(), {camSize: 'MS', camMode: cast.length ? 'coverage' : 'free', camCast: cast}); master = ''; }
+        master += (master ? '\n' : '') + line;
+      }
+      add('', master.trim() || scene.title, {camSize: 'MS', camMode: cast.length ? 'coverage' : 'free', camCast: cast});
+      for (const block of blocks) {
+        // Dialogue stays together in the scene's master/coverage row. It is
+        // filmed in takes, not as a fresh Shot for every spoken line.
+        if (block.kind === 'dialogue') continue;
+        if (block.kind === 'audio') continue; // VO stays in master; it is not an on-camera cast member.
+        const props = propsIn(block.text);
+        const reaction = /(?:驚訝|惊讶|吃驚|吃惊|驚醒|惊醒|反眼|奸笑|皺眉|皱眉|愣住|愕然|落淚|流淚|流泪|表情|reaction|reacts|smiles|frowns|startled)/i.test(block.text);
+        const insert = props.length && /(?:拿|取|遞|递|撕|寫|写|看|望|見|见|讀|读|打開|打开|按|輸入|输入|放|交|露出|show|read|pick|hand|open|tear)/i.test(block.text);
+        const movement = movementIn(block.text);
+        if (insert) add('Insert — ' + props.join('、'), block.text, {camSize: 'CU', camMode: 'special', camMovement: movement});
+        if (reaction) add('Reaction', block.text, {camSize: 'CU', camMode: 'special'});
+        if (!insert && !reaction && (movement || /進入|进入|離開|离开|走|跑|跪|站起|衝|冲|搶|抢|拉扯|enters|leaves|walks|kneels/i.test(block.text))) {
+          add('動作 coverage', block.text, {camSize: 'MS', camMode: movement ? 'special' : 'free', camMovement: movement});
+        }
+      }
+      scene.shots = shots;
+      scene.location = location;
+    }
+    return {scenes: sceneList, source: text, count: number - 1};
+  };
+
+  const newScene = title => {
+    const node = document.createElement('section');
+    node.className = 'scene';
+    node.dataset.scene = '';
+    node.innerHTML = '<div class="scene-head"><div contenteditable="true"></div><div class="scene-actions"><button class="icon-button" data-add-shot type="button" title="在此 Scene 最後新增 Shot">＋ Shot</button><button class="icon-button danger" data-delete-scene type="button">刪 Scene</button></div></div><div class="table-wrap"><table class="shot-table"><thead><tr><th>No.</th><th>Ref</th><th>Cam</th><th>Description</th><th>Props / Location</th></tr></thead><tbody></tbody></table><button class="add-shot" data-add-shot type="button">＋ 加 Shot</button></div>';
+    node.querySelector('[contenteditable]').textContent = '【' + title + '】';
+    return node;
+  };
+  const nextNumber = () => [...document.querySelectorAll('.shot-no')].reduce((max, node) => Math.max(max, parseInt(node.textContent, 10) || 0), 0) + 1;
+  const upgradeShotRow = row => {
+    row.draggable = false;
+    let tools = row.querySelector('.row-tools');
+    if (!tools) {
+      tools = document.createElement('div'); tools.className = 'row-tools';
+      tools.innerHTML = '<button data-move="up" type="button">↑</button><button data-move="down" type="button">↓</button><button data-delete-row type="button">刪</button>';
+      row.cells[0].append(tools);
+    }
+    if (tools && !tools.querySelector('[data-add-shot]')) {
+      const button = document.createElement('button');
+      button.type = 'button'; button.dataset.addShot = '';
+      button.textContent = '＋'; button.title = '在這個 Shot 後新增 Shot';
+      button.setAttribute('aria-label', '在這個 Shot 後新增 Shot');
+      tools.append(button);
+    }
+    if (!row.cells[0].querySelector('.drag-handle')) {
+      const handle = document.createElement('button'); handle.type = 'button';
+      handle.className = 'drag-handle'; handle.draggable = true;
+      handle.textContent = '⋮⋮ 拖動'; handle.setAttribute('aria-label', '拖動這個 Shot 排序');
+      row.cells[0].append(handle);
+    }
+  };
+  const upgradePropsLocationRow = row => {
+    if (row.cells.length === 5 && row.cells[4].classList.contains('props-location-cell')) return;
+    if (row.cells.length < 6) return;
+    const propsCell = row.cells[4], locationCell = row.cells[5];
+    const merged = document.createElement('td'); merged.className = 'props-location-cell';
+    const props = document.createElement('div'); props.className = 'props-cell';
+    const location = document.createElement('div'); location.className = 'location-cell';
+    while (propsCell.firstChild) props.append(propsCell.firstChild);
+    while (locationCell.firstChild) location.append(locationCell.firstChild);
+    merged.append(props, location);
+    propsCell.replaceWith(merged); locationCell.remove();
+  };
+  const newShot = ({number = nextNumber(), cam = '', description = '', props = '', location = '', camSize = '', camMode = 'free', camCast = [], camMovement = ''} = {}) => {
+    const row = $('#shotTemplate').content.firstElementChild.cloneNode(true);
+    row.querySelector('.shot-no').textContent = number;
+    row.cells[2].textContent = cam; row.cells[3].querySelector('.description-text').textContent = description;
+    row.cells[4].querySelector('.props-text').textContent = props;
+    row.cells[4].querySelector('.location-text').textContent = location;
+    upgradeCamCell(row.cells[2]);
+    upgradeDescriptionCell(row.cells[3]);
+    row.cells[2].querySelector('.cam-size').value = camSize;
+    setCamMode(row.cells[2], camMode, camCast);
+    setCamMode(row.cells[2], camMode, camCast);
+    row.cells[2].querySelector('[data-cam-field="movement"]').textContent = camMovement;
+    upgradeRefCell(row.querySelector('.ref-cell'));
+    upgradePropsCell(row.cells[4].querySelector('.props-cell'));
+    upgradeLocationCell(row.cells[4].querySelector('.location-cell'));
+    upgradeShotRow(row);
+    return row;
+  };
+  const updateOrderNumbers = changes => {
+    if (!changes.size) return;
+    document.querySelectorAll('.order-table tbody tr td:nth-child(3)').forEach(cell => {
+      const walker = document.createTreeWalker(cell, NodeFilter.SHOW_TEXT);
+      const nodes = [];
+      while (walker.nextNode()) nodes.push(walker.currentNode);
+      for (const node of nodes) {
+        node.nodeValue = node.nodeValue.split('\n').map(line => {
+          const colon = Math.max(line.indexOf('：'), line.indexOf(':'));
+          // Generated Shot Order rows are bare lists; existing notes put shot
+          // numbers after a colon. Leave labels such as "3 cam" untouched.
+          const bareList = /^\s*\d+(?:\s*[/、，,\-–—]\s*\d+)*\s*$/.test(line);
+          const namedShot = /(?:\bshot\b|鏡頭|镜头|鏡號|镜号)\s*#?\s*\d+/i.test(line);
+          if (colon < 0 && !bareList && !namedShot) return line;
+          return line.replace(/(^|[^\w.])(\d+)(?![\w.])/g, (match, before, number, offset) => {
+            if (colon >= 0 && offset < colon) return match;
+            return before + (changes.get(number) || number);
+          });
+        }).join('\n');
+      }
+    });
+  };
+  const renumberShots = () => {
+    const rows = [...scenes().querySelectorAll('.shot-row')];
+    const counts = new Map();
+    for (const row of rows) {
+      const old = row.querySelector('.shot-no').textContent.trim();
+      counts.set(old, (counts.get(old) || 0) + 1);
+    }
+    const changes = new Map();
+    let ambiguous = false;
+    rows.forEach((row, index) => {
+      const node = row.querySelector('.shot-no');
+      const old = node.textContent.trim(), next = String(index + 1);
+      if (old !== next) {
+        if (counts.get(old) === 1 && /^\d+$/.test(old)) changes.set(old, next);
+        else ambiguous = true;
+        node.textContent = next;
+      }
+    });
+    updateOrderNumbers(changes);
+    if (ambiguous) toast('已按順序更新 No.；原有鏡號重複或非數字，請核對 Shot Order。');
+  };
+  const applyDraft = (draft, title, warning = '', keepReferences = false) => {
+    const fragment = document.createDocumentFragment();
+    for (const scene of draft.scenes) {
+      const node = newScene(scene.title);
+      for (const shot of scene.shots) node.querySelector('tbody').append(newShot(shot));
+      fragment.append(node);
+    }
+    // Build everything before replacing the visible board. Keep previous content recoverable.
+    clearActionHistory(); rememberBoard();
+    clearSceneUndo();
+    scenes().replaceChildren(fragment);
+    $('#projectTitle').value = title || 'Storyboard';
+    if (!keepReferences) document.querySelectorAll('[data-free-section]').forEach(section => {
+      section.querySelectorAll('.media-card:not(.media-add)').forEach(card => card.remove());
+      const note = section.querySelector('.free-body');
+      if (note) note.textContent = '';
+    });
+    const order = document.querySelector('.order-table tbody');
+    if (order) {
+      order.replaceChildren();
+      draft.scenes.forEach(scene => {
+        const row = order.insertRow();
+        ['', scene.title, scene.shots.map(shot => shot.number).join('、')].forEach(text => {
+          const cell = row.insertCell(); cell.contentEditable = 'true'; cell.textContent = text;
+        });
+      });
+    }
+    $('.script-source')?.remove();
+    const details = document.createElement('details');
+    details.className = 'script-source';
+    const summary = document.createElement('summary'); summary.textContent = '查看匯入原文';
+    const pre = document.createElement('pre'); pre.textContent = draft.source;
+    details.append(summary, pre); board().append(details);
+    notice('已生成 ' + draft.scenes.length + ' 個 Scene、' + draft.count + ' 個 Shot。景別按基本規則建議，可直接改；Shot Order 已列出新鏡號，時間留空。' + (warning ? ' ' + warning : ''), 'success');
+    $('#regenerateBtn').hidden = false;
+    void persist();
+    scenes().scrollIntoView?.({behavior: 'smooth', block: 'start'});
+    return draft;
+  };
+  const importFile = async file => {
+    const revision = ++importRevision;
+    let active = true;
+    const progress = message => { if (active && revision === importRevision) notice(message); };
+    progress('正在讀取 ' + file.name + '…');
+    $('#saveStatus').textContent = 'Importing…';
+    try {
+      const result = await withTimeout(extractText(file, progress), 120000, '匯入逾時，原有內容已保留。請重新匯入或貼上文字。');
+      if (revision !== importRevision) return;
+      progress('正在整理場景和拆分 Shot…');
+      const draft = buildDraft(result.text);
+      applyDraft(draft, file.name.replace(/\.[^.]+$/, ''), result.warning);
+    } catch (error) {
+      if (revision !== importRevision) return;
+      notice('匯入失敗：' + error.message + ' 原有內容未更改。', 'error');
+      $('#saveStatus').textContent = 'Import failed';
+    } finally {
+      active = false;
+    }
+  };
+  const datedFilename = extension => {
+    const now = new Date(), two = value => String(value).padStart(2, '0');
+    const suffix = String(now.getFullYear()).slice(-2) + two(now.getMonth() + 1) + two(now.getDate()) + '_' + two(now.getHours()) + two(now.getMinutes());
+    const base = ($('#projectTitle').value || '').trim().replace(/[<>:"/\\|?*\u0000-\u001f]/g, '-').replace(/\.+$/, '').slice(0, 90) || 'storyboard';
+    return base + '_' + suffix + '.' + extension;
+  };
+  const exportHTML = async () => {
+    if (pendingImages) return toast('正在加入圖片，完成後再 Save HTML。');
+    commitEditorEdit(true);
+    snapshot();
+    const clone = document.documentElement.cloneNode(true);
+    clone.dataset.draftId = 'saved-' + Date.now() + '-' + Math.random().toString(36).slice(2);
+    clone.querySelectorAll('[data-import-library]').forEach(node => node.remove());
+    clone.querySelector('#toast')?.classList.remove('show');
+    clone.querySelector('#pasteDialog')?.removeAttribute('open');
+    clone.querySelectorAll('.toolbar-menu[open]').forEach(node => node.removeAttribute('open'));
+    clone.querySelectorAll('[inert]').forEach(node => node.removeAttribute('inert'));
+    clone.querySelectorAll('.drop-active').forEach(node => node.classList.remove('drop-active'));
+    const textArea = clone.querySelector('#pasteText'); if (textArea) textArea.textContent = '';
+    clone.querySelector('#helpDialog')?.removeAttribute('open');
+    const blob = new Blob(['<!doctype html>\n' + clone.outerHTML], {type: 'text/html;charset=utf-8'});
+    return saveProjectFile(blob, datedFilename('html'), 'HTML', '.html', 'text/html');
+  };
+  const exportProject = async () => {
+    if (pendingImages) return toast('正在加入圖片，完成後再備份。');
+    commitEditorEdit(true);
+    const data = {format: 'micy-storyboard-project', version: 1, editorVersion: '0.32', exportedAt: new Date().toISOString(), boardHTML: snapshot()};
+    const blob = new Blob([JSON.stringify(data)], {type: 'application/json;charset=utf-8'});
+    return saveProjectFile(blob, datedFilename('storyboard.json'), 'Storyboard 工程備份', '.json', 'application/json');
+  };
+  const saveProjectFile = async (blob, filename, description, extension, mimeType) => {
+    if (typeof window.showSaveFilePicker === 'function') {
+      let handle;
+      try {
+        handle = await window.showSaveFilePicker({suggestedName: filename, types: [{description, accept: {[mimeType]: [extension]}}]});
+      } catch (error) {
+        if (error?.name === 'AbortError') return;
+        notice('此瀏覽器未能開啟選擇儲存位置，將改用下載。', 'error');
+      }
+      if (handle) {
+        try {
+          const writable = await handle.createWritable();
+          await writable.write(blob);
+          await writable.close();
+          toast('已保存到你選擇的位置：' + filename);
+        } catch (error) { notice('保存失敗：' + error.message + '。原有分鏡仍在頁面上，請重試。', 'error'); }
+        return;
+      }
+    }
+    if (typeof navigator.share === 'function' && typeof navigator.canShare === 'function' && typeof File === 'function') {
+      const file = new File([blob], filename, {type: mimeType});
+      let canShare = false;
+      try { canShare = navigator.canShare({files: [file]}); } catch { /* Use the download fallback. */ }
+      if (canShare) {
+        try { await navigator.share({files: [file], title: filename}); toast('可在分享選單選「儲存到檔案」並選擇位置。'); }
+        catch (error) { if (error?.name !== 'AbortError') notice('未能開啟分享選單：' + error.message, 'error'); }
+        return;
+      }
+    }
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a'); link.href = url;
+    link.download = filename;
+    link.click(); setTimeout(() => URL.revokeObjectURL(url), 60000);
+    toast('已下載 ' + filename + '；若沒有位置選擇視窗，請到瀏覽器設定開啟「下載前詢問儲存位置」。');
+  };
+  const isHeic = file => /\.(?:heic|heif)$/i.test(file.name) || /^image\/hei[cf](?:-sequence)?$/i.test(file.type);
+  const readImageData = file => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reader.onabort = () => reject(new Error('未能讀取 ' + file.name));
+    reader.readAsDataURL(file);
+  });
+  const nativeHeicToJpeg = async file => {
+    if (!window.createImageBitmap) throw new Error('No native HEIC decoder');
+    const bitmap = await withTimeout(createImageBitmap(file), 20000, 'HEIC 解碼逾時');
+    try {
+      const scale = Math.min(1, 2600 / Math.max(bitmap.width, bitmap.height));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+      canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+      const context = canvas.getContext('2d');
+      if (!context) throw new Error('Canvas unavailable');
+      context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+      return await new Promise((resolve, reject) => canvas.toBlob(
+        blob => blob ? resolve(blob) : reject(new Error('JPEG 轉換失敗')), 'image/jpeg', 0.86
+      ));
+    } finally { bitmap.close?.(); }
+  };
+  const imageDataFor = async file => {
+    if (!isHeic(file)) return readImageData(file);
+    toast('正在轉換 HEIC：' + file.name);
+    let jpeg;
+    try { jpeg = await nativeHeicToJpeg(file); }
+    catch {
+      try {
+        const convert = await loadClassic('HeicTo', 'https://cdn.jsdelivr.net/npm/heic-to@1.5.2/dist/iife/heic-to.js');
+        jpeg = await withTimeout(convert({blob: file, type: 'image/jpeg', quality: 0.86}), 120000, 'HEIC 轉換逾時');
+      } catch (error) {
+        throw new Error(file.name + ' 的 HEIC 轉換失敗：' + error.message + '。可先匯出 JPEG 再加入。');
+      }
+    }
+    if (Array.isArray(jpeg)) jpeg = jpeg[0];
+    if (!jpeg || jpeg.type !== 'image/jpeg') throw new Error(file.name + ' 未能轉成 JPEG，請先匯出 JPEG 再加入。');
+    return readImageData(jpeg);
+  };
+  const addImages = async (files, target, kind = 'ref') => {
+    const images = files.filter(file => file.type.startsWith('image/') || isHeic(file));
+    if (!images.length) return toast('請拖入圖片檔案，或點擊選擇照片。');
+    if (images.length !== files.length) toast('已略過非圖片檔案。');
+    ++pendingImages;
+    const revision = importRevision;
+    try {
+      // Read in file order, not FileReader completion order.
+      for (const file of images) {
+        const data = await imageDataFor(file);
+        if (revision !== importRevision || !target.isConnected) return;
+        const img = document.createElement('img'); img.src = data; img.alt = file.name;
+        img.draggable = false;
+        if (img.decode) await withTimeout(img.decode(), 30000, '圖片解碼逾時：' + file.name);
+        if (kind === 'set') {
+          const grid = target.matches('[data-media-grid]') ? target : target.closest('[data-media-grid]');
+          if (!grid) return;
+          const card = document.createElement('div'); card.className = 'media-card';
+          card.innerHTML = '<button class="icon-button remove-media" type="button" aria-label="刪除圖片">×</button><div class="media-caption" contenteditable="true"></div>';
+          card.querySelector('.media-caption').textContent = file.name; card.prepend(img);
+          const anchor = target.matches('.media-add') ? target : grid.querySelector('.media-add');
+          anchor ? anchor.before(card) : grid.append(card);
+          upgradeMediaGrid(grid);
+        } else if (kind === 'location') {
+          const cell = target.closest('.location-cell');
+          if (!cell) return;
+          const card = document.createElement('div'); card.className = 'location-image';
+          card.append(img); cell.querySelector('.location-media').append(card);
+          upgradeLocationCell(cell);
+        } else {
+          const anchor = target.querySelector('.ref-tools');
+          anchor ? anchor.before(img) : target.append(img);
+          upgradeRefCell(target);
+        }
+        void persist();
+      }
+    } catch (error) {
+      toast(error.message);
+      notice('圖片未能加入：' + error.message, 'error');
+    }
+    finally { --pendingImages; }
+  };
+  let repairingLegacyHeic = false;
+  const repairLegacyHeicImages = async () => {
+    if (repairingLegacyHeic) return;
+    const oldImages = [...board().querySelectorAll('img')].filter(img =>
+      img.src.startsWith('data:') && !img.src.startsWith('data:image/jpeg')
+      && isHeic({name: img.alt || '', type: img.src.match(/^data:([^;,]*)/)?.[1] || ''})
+    );
+    if (!oldImages.length) return;
+    repairingLegacyHeic = true; ++pendingImages;
+    const revision = importRevision;
+    let converted = 0, failed = 0;
+    try {
+      for (const img of oldImages) {
+        try {
+          const blob = await fetch(img.src).then(response => response.blob());
+          const file = new File([blob], img.alt || 'reference.heic', {type: blob.type || 'image/heic'});
+          const data = await imageDataFor(file);
+          if (revision !== importRevision || !img.isConnected) return;
+          img.src = data;
+          if (img.decode) await withTimeout(img.decode(), 30000, 'HEIC 圖片解碼逾時');
+          converted++;
+        } catch { failed++; }
+      }
+      if (converted) void persist();
+      if (failed) notice('有 ' + failed + ' 張舊 HEIC 圖片未能轉換；請連線後重開，或重新拖入照片。', 'error');
+    } finally { repairingLegacyHeic = false; --pendingImages; }
+  };
+  const restoreHTMLFile = async file => {
+    const revision = ++importRevision;
+    try {
+      let source = await file.text();
+      if (/\.json$/i.test(file.name)) {
+        const backup = JSON.parse(source);
+        if (backup?.format !== 'micy-storyboard-project' || backup.version !== 1 || typeof backup.boardHTML !== 'string') throw new Error('這不是支援的 Storyboard 工程備份，請選擇由本工具匯出的 JSON。');
+        source = '<section id="board">' + backup.boardHTML + '</section>';
+      }
+      const page = new DOMParser().parseFromString(source, 'text/html');
+      const saved = page.querySelector('#board');
+      if (!saved?.querySelector('#scenes') || !saved.querySelector('#projectTitle')) throw new Error('請選擇由 Storyboard Editor 保存的 HTML 或 JSON 工程備份。');
+      // Import only a passive board, never an exported file's scripts or handlers.
+      const tags = new Set('SECTION DIV SPAN INPUT SELECT OPTION BUTTON LABEL TABLE THEAD TBODY TFOOT TR TD TH IMG BR DETAILS SUMMARY PRE P STRONG EM B I U S UL OL LI A'.split(' '));
+      const attributes = new Set('class id contenteditable draggable hidden value checked selected type accept multiple alt aria-label role colspan rowspan open placeholder title data-scene data-media-grid data-ref-category data-location-group data-location-groups data-add-location-group data-delete-location-group data-free-section data-order-section data-media-input data-ref-input data-location-input data-ref-url data-add-link data-delete-scene data-delete-row data-move data-add-shot data-add-order-row data-add-take data-add-coverage data-remove-take data-remove-coverage data-cam-field data-mode data-tint'.split(' '));
+      for (const node of [...saved.querySelectorAll('*')]) {
+        if (!tags.has(node.tagName)) { node.remove(); continue; }
+        for (const attr of [...node.attributes]) {
+          if (node.tagName === 'IMG' && attr.name === 'src' && /^data:image\/(?:png|jpeg|jpg|gif|webp|avif|bmp|svg\+xml);/i.test(attr.value)) continue;
+          if (node.tagName === 'A' && attr.name === 'href') continue;
+          if (!attributes.has(attr.name)) node.removeAttribute(attr.name);
+        }
+        if (node.tagName === 'A') {
+          try {
+            const href = new URL(node.getAttribute('href') || '');
+            if (!['http:', 'https:'].includes(href.protocol)) throw new Error('Unsafe link');
+            node.href = href.href; node.target = '_blank'; node.rel = 'noopener noreferrer';
+          } catch { node.replaceWith(document.createTextNode(node.textContent)); }
+        }
+        if (node.tagName === 'BUTTON') node.type = 'button';
+      }
+      if (revision !== importRevision) return;
+      rememberBoard(); clearSceneUndo(); restoreBoard(saved.innerHTML);
+      $('#regenerateBtn').hidden = !$('.script-source pre');
+      notice('已載入保存的分鏡、圖片和 Shot Order。可繼續修改，之後會自動存於此瀏覽器。', 'success');
+      void persist();
+    } catch (error) { if (revision === importRevision) notice(error.message + ' 原有內容已保留。', 'error'); }
+  };
+  document.addEventListener('click', event => {
+    const menu = event.target.closest('.toolbar-menu');
+    document.querySelectorAll('.toolbar-menu[open]').forEach(other => { if (other !== menu) other.open = false; });
+    if (menu && event.target.closest('button')) menu.open = false;
+  });
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape') document.querySelectorAll('.toolbar-menu[open]').forEach(menu => { menu.open = false; });
+    if (!(event.metaKey || event.ctrlKey)) return;
+    if (event.key.toLowerCase() === 's') { event.preventDefault(); if (ready) void exportHTML(); return; }
+    if (!['z', 'Z', 'y', 'Y'].includes(event.key)) return;
+    if (event.target.closest?.('[contenteditable="true"], input, textarea, select')) return;
+    event.preventDefault();
+    if (event.key.toLowerCase() === 'y' || event.shiftKey) redoAction();
+    else undoAction();
+  });
+  document.addEventListener('click', event => {
+    const button = event.target.closest('button'); if (!button) return;
+    if (!ready) { toast('正在恢復已保存內容，請稍候。'); return; }
+    if (button.id === 'undoBtn') { undoAction(); return; }
+    if (button.id === 'redoBtn') { redoAction(); return; }
+    if (button.matches('[data-add-order-row]')) {
+      commitEditorEdit(true);
+      const tbody = button.closest('[data-order-section]')?.querySelector('.order-table tbody');
+      if (!tbody) return toast('找不到 Shot Order 表格。');
+      const row = tbody.insertRow();
+      ['時間', '拍攝內容', 'Shot / Notes'].forEach(() => {
+        const cell = row.insertCell(); cell.contentEditable = 'true';
+      });
+      const index = [...tbody.rows].indexOf(row);
+      recordAction({
+        label: '新增 Shot Order 行',
+        undo: () => row.remove(),
+        redo: () => tbody.insertBefore(row, tbody.rows[index] || null)
+      });
+      void persist();
+      row.cells[0].focus();
+      toast('已新增 Shot Order 行');
+      return;
+    }
+    if (button.matches('[data-add-location-group]')) {
+      const category = button.closest('[data-ref-category="location"]'), container = button.closest('[data-location-groups]');
+      const group = createLocationRefGroup(container);
+      upgradeBoard();
+      group.querySelector('.location-ref-title')?.focus();
+      void persist(); return;
+    }
+    if (button.matches('[data-delete-location-group]')) {
+      const group = button.closest('[data-location-group]'), container = group?.parentElement;
+      const photoCount = group?.querySelectorAll('.media-card:not(.media-add)').length || 0;
+      const title = group?.querySelector('.location-ref-title')?.textContent.trim() || '未命名地點';
+      if (photoCount && !window.confirm('刪除「' + title + '」這組和裡面的 ' + photoCount + ' 張照片？')) return;
+      group?.remove();
+      if (container && !container.querySelector(':scope > [data-location-group]')) createLocationRefGroup(container);
+      upgradeBoard(); void persist(); return;
+    }
+    if (button.id === 'pasteScriptBtn') { $('#pasteError').textContent = ''; $('#pasteDialog').showModal(); return; }
+    if (button.id === 'generatePasteBtn') {
+      try { const draft = buildDraft($('#pasteText').value); ++importRevision; applyDraft(draft, '新劇本'); $('#pasteDialog').close(); }
+      catch (error) { $('#pasteError').textContent = error.message; }
+      return;
+    }
+    if (button.id === 'saveBtn') return exportHTML();
+    if (button.id === 'backupBtn') return exportProject();
+    if (button.id === 'helpBtn') { $('#helpDialog').showModal(); return; }
+    if (button.id === 'regenerateBtn') {
+      const source = $('.script-source pre')?.textContent;
+      if (!source) return toast('尚未有已匯入的劇本。');
+      try { ++importRevision; applyDraft(buildDraft(source), $('#projectTitle').value, '已保留 Ref；原有分鏡可按「復原匯入前內容」取回。', true); }
+      catch (error) { notice(error.message, 'error'); }
+      return;
+    }
+    if (button.id === 'printBtn') return window.print();
+    if (button.id === 'undoImportBtn' && undoSnapshot) {
+      ++importRevision; const previous = snapshot(); clearSceneUndo(); restoreBoard(undoSnapshot); undoSnapshot = previous;
+      $('#regenerateBtn').hidden = !$('.script-source pre');
+      persist(); notice('已恢復匯入前內容。', 'success'); return;
+    }
+    if (button.id === 'undoSceneBtn' && sceneUndoSnapshot) {
+      if (saveRevision > sceneUndoRevision && !window.confirm('撤銷會還原刪除前整份分鏡，刪除後新增的修改也會被覆蓋。確定撤銷嗎？')) return;
+      ++importRevision;
+      const old = sceneUndoSnapshot; clearSceneUndo(); restoreBoard(old);
+      void persist();
+      notice('已撤銷刪除，Scene 和其中的 Shot 已恢復。', 'success');
+      return;
+    }
+    if (button.id === 'resetBtn') {
+      if (!window.confirm('建立空白工程？目前內容可用「復原匯入前內容」取回；建議先保存 HTML 或工程備份。')) return;
+      ++importRevision; rememberBoard(); clearSceneUndo(); restoreBoard(initialBoard);
+      $('#regenerateBtn').hidden = true;
+      void persist(); return;
+    }
+    if (button.id === 'addSceneBtn') {
+      const scene = newScene('新 Scene'); scene.querySelector('tbody').append(newShot());
+      scenes().append(scene); scene.scrollIntoView?.({behavior: 'smooth', block: 'center'});
+    }
+    if (button.matches('[data-add-shot]')) {
+      try {
+        const scene = button.closest('[data-scene], .scene');
+        const table = scene?.querySelector('.shot-table tbody');
+        if (!table) throw new Error('找不到這個 Scene 的 Shot 表格。');
+        const orderBefore = readShotOrder();
+        const row = newShot();
+        const previous = button.closest('.shot-row');
+        if (previous) previous.after(row);
+        else table.append(row);
+        renumberShots();
+        const parent = row.parentElement, index = shotRowsIn(parent).indexOf(row), orderAfter = readShotOrder();
+        recordAction({label: '新增 Shot', undo: () => { row.remove(); restoreShotNumbers(); writeShotOrder(orderBefore); }, redo: () => { placeShotAt(parent, row, index); restoreShotNumbers(); writeShotOrder(orderAfter); }});
+        void persist();
+        row.scrollIntoView?.({behavior: 'smooth', block: 'center'});
+        row.cells[3].querySelector('.description-text')?.focus();
+        toast('已加入 Shot ' + row.querySelector('.shot-no').textContent);
+      } catch (error) { notice('新增 Shot 失敗：' + error.message, 'error'); }
+      return;
+    }
+    if (button.matches('[data-delete-scene]')) {
+      const scene = button.closest('[data-scene]');
+      if (document.querySelectorAll('[data-scene]').length <= 1) return toast('至少保留一個 Scene');
+      const title = scene.querySelector('.scene-head [contenteditable]')?.textContent.trim() || '這個 Scene';
+      const count = scene.querySelectorAll('.shot-row').length;
+      if (!window.confirm('確定刪除「' + title + '」及其中 ' + count + ' 個 Shot？刪除後可按「撤銷刪 Scene」取回。')) return;
+      clearActionHistory();
+      sceneUndoSnapshot = snapshot();
+      scene.remove(); renumberShots();
+      $('#undoSceneBtn').hidden = false;
+      void persist(); sceneUndoRevision = saveRevision;
+      toast('Scene 已刪除；可按「撤銷刪 Scene」取回');
+      return;
+    }
+    if (button.matches('[data-add-take]')) {
+      addCoverageTake(button.closest('.cam-cell'), ['']);
+      void persist(); return;
+    }
+    if (button.matches('[data-add-coverage]')) {
+      const item = addCoverageItem(button.closest('.coverage-take'), '');
+      item.querySelector('.coverage-name').focus();
+      void persist(); return;
+    }
+    if (button.matches('[data-remove-take]')) {
+      button.closest('.coverage-take').remove();
+      void persist(); return;
+    }
+    if (button.matches('[data-remove-coverage]')) {
+      button.closest('.coverage-item').remove();
+      void persist(); return;
+    }
+    if (button.matches('.props-suggest')) {
+      const row = button.closest('.shot-row');
+      const cell = row.cells[4].querySelector('.props-text');
+      const existing = cell.textContent.trim();
+      const written = new Set(existing.split(/[、，,;；\n]+/).map(s => s.trim().toLowerCase()).filter(Boolean));
+      const found = propsIn(row.cells[3].querySelector('.description-text')?.textContent || row.cells[3].textContent).filter(item => !written.has(item.toLowerCase()));
+      if (!found.length) return toast('沒有辨認到新的道具；Props 仍可直接手寫。');
+      cell.textContent = existing + (existing ? '、' : '') + found.join('、');
+      void persist(); toast('已補上：' + found.join('、')); return;
+    }
+    if (button.matches('[data-delete-row]')) {
+      const row = button.closest('.shot-row'), parent = row.parentElement, index = shotRowsIn(parent).indexOf(row);
+      const number = row.querySelector('.shot-no').textContent.trim(), orderBefore = readShotOrder();
+      row.remove(); renumberShots();
+      const orderAfter = readShotOrder();
+      recordAction({label: '刪除 Shot ' + number, undo: () => { placeShotAt(parent, row, index); restoreShotNumbers(); writeShotOrder(orderBefore); }, redo: () => { row.remove(); renumberShots(); writeShotOrder(orderAfter); }});
+    }
+    if (button.matches('[data-move]')) {
+      const row = button.closest('.shot-row'), parent = row.parentElement, beforeIndex = shotRowsIn(parent).indexOf(row);
+      const orderBefore = readShotOrder(), sibling = button.dataset.move === 'up' ? row.previousElementSibling : row.nextElementSibling;
+      if (sibling) {
+        button.dataset.move === 'up' ? sibling.before(row) : sibling.after(row);
+        renumberShots();
+        const afterIndex = shotRowsIn(parent).indexOf(row);
+        if (afterIndex !== beforeIndex) {
+          const orderAfter = readShotOrder();
+          recordAction({label: '調整 Shot 次序', undo: () => { placeShotAt(parent, row, beforeIndex); restoreShotNumbers(); writeShotOrder(orderBefore); }, redo: () => { placeShotAt(parent, row, afterIndex); restoreShotNumbers(); writeShotOrder(orderAfter); }});
+        }
+      }
+    }
+    if (button.matches('.remove-media')) {
+      const grid = button.closest('[data-media-grid]');
+      removeWithUndo(button.closest('.media-card'), '刪除參考圖片', () => upgradeMediaGrid(grid));
+      return;
+    }
+    if (button.matches('.move-media-up, .move-media-down')) {
+      const card = button.closest('.media-card'), grid = card?.parentElement, cards = grid && mediaCards(grid), index = cards?.indexOf(card);
+      const neighbor = index == null ? null : cards[index + (button.matches('.move-media-up') ? -1 : 1)];
+      if (neighbor) {
+        button.matches('.move-media-up') ? neighbor.before(card) : neighbor.after(card);
+        upgradeMediaGrid(grid);
+        void persist(); toast('已調整圖片次序');
+      }
+      return;
+    }
+    if (button.matches('.remove-link')) { removeWithUndo(button.closest('.ref-link'), '刪除參考連結'); return; }
+    if (button.matches('.remove-location-image')) {
+      const cell = button.closest('.location-cell');
+      removeWithUndo(button.closest('.location-image'), '刪除 Location 圖片', () => upgradeLocationCell(cell));
+      return;
+    }
+    if (button.matches('.remove-ref')) {
+      const cell = button.closest('.ref-cell');
+      removeWithUndo(button.closest('.ref-image'), '刪除 Shot 參考圖片', () => upgradeRefCell(cell));
+      return;
+    }
+    if (button.closest('#pasteDialog')) return;
+    persist();
+  });
+  const editableControl = target => target.closest('#board [contenteditable="true"], #board input:not([type="file"]), #board select, #board textarea');
+  document.addEventListener('focusin', event => {
+    const target = editableControl(event.target);
+    if (!target) return;
+    if (editingTarget !== target) {
+      commitEditorEdit(true);
+      editingTarget = target; editingBefore = readEditValue(target);
+    }
+  });
+  document.addEventListener('focusout', event => {
+    const target = editableControl(event.target);
+    if (target && editingTarget === target) { commitEditorEdit(true); void flushPersist(); }
+  });
+  document.addEventListener('change', event => {
+    if (editableControl(event.target) === editingTarget) commitEditorEdit(false);
+    if (event.target.matches('.cam-cell select, .coverage-item input[type="checkbox"]')) {
+      if (event.target.matches('.cam-mode')) setCamMode(event.target.closest('.cam-cell'), event.target.value);
+      void persist(); return;
+    }
+    const input = event.target, files = Array.from(input.files || []), file = files[0];
+    if (!file) return;
+    input.closest('.toolbar-menu')?.removeAttribute('open');
+    input.value = ''; // Copy the selected File before resetting; allow retry of the same file.
+    if (!ready) return toast('正在恢復已保存內容，請稍候再選擇。');
+    if (input.id === 'scriptInput') void importFile(file);
+    if (input.id === 'restoreInput') void restoreHTMLFile(file);
+    if (input.matches('[data-ref-input]')) void addImages(files, input.closest('.ref-cell'));
+    if (input.matches('[data-location-input]')) void addImages(files, input.closest('.location-cell'), 'location');
+    if (input.matches('[data-media-input]')) void addImages(files, input.closest('.media-add'), 'set');
+  });
+  document.addEventListener('input', event => {
+    if (!event.target.closest('#board')) return;
+    if (event.isComposing) return;
+    const target = editableControl(event.target);
+    if (target) {
+      if (editingTarget !== target) {
+        commitEditorEdit(true);
+        editingTarget = target; editingBefore = readEditValue(target);
+      }
+      clearTimeout(editHistoryTimer);
+      editHistoryTimer = setTimeout(() => commitEditorEdit(false), 700);
+    }
+    schedulePersist();
+  });
+  document.addEventListener('compositionend', event => { if (event.target.closest('#board')) schedulePersist(); });
+  document.addEventListener('visibilitychange', () => { if (document.hidden) void flushPersist(); });
+  window.addEventListener('pagehide', () => { void flushPersist(); });
+  let printNotes = [];
+  window.addEventListener('beforeprint', () => {
+    printNotes = [...document.querySelectorAll('.cam-notes')].map(node => [node, node.open]);
+    printNotes.forEach(([node]) => { if (node.querySelector('.cam-note')?.textContent.trim()) node.open = true; });
+  });
+  window.addEventListener('afterprint', () => {
+    printNotes.forEach(([node, wasOpen]) => { node.open = wasOpen; });
+    printNotes = [];
+  });
+  window.addEventListener('beforeunload', event => {
+    void flushPersist();
+    if (pendingImages || (saveRevision > durableRevision && saveRevision > cachedRevision)) {
+      event.preventDefault(); event.returnValue = '';
+    }
+  });
+  let draggedRow, draggedRowOrigin, draggedMediaCard;
+  document.addEventListener('dragstart', event => {
+    const mediaHandle = event.target.closest('.media-drag-handle');
+    if (mediaHandle) {
+      draggedMediaCard = mediaHandle.closest('.media-card:not(.media-add)');
+      draggedMediaCard?.classList.add('dragging');
+      if (event.dataTransfer) { event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData('text/plain', 'storyboard-media'); }
+      return;
+    }
+    const handle = event.target.closest('.drag-handle');
+    if (!handle) return;
+    draggedRow = handle.closest('.shot-row');
+    draggedRowOrigin = draggedRow ? {parent: draggedRow.parentElement, index: shotRowsIn(draggedRow.parentElement).indexOf(draggedRow), order: readShotOrder()} : null;
+    draggedRow?.classList.add('dragging');
+  });
+  document.addEventListener('dragover', event => {
+    const files = Array.from(event.dataTransfer?.types || []).includes('Files');
+    if (files) {
+      event.preventDefault();
+      const zone = event.target.closest('[data-media-grid], .ref-cell, .location-cell')
+        || event.target.closest('[data-location-group]')?.querySelector('[data-media-grid]')
+        || event.target.closest('[data-ref-category]')?.querySelector('[data-media-grid]')
+        || event.target.closest('[data-free-section]')?.querySelector('[data-media-grid]');
+      document.querySelectorAll('.drop-active').forEach(node => { if (node !== zone) node.classList.remove('drop-active'); });
+      zone?.classList.add('drop-active');
+      if (event.dataTransfer) event.dataTransfer.dropEffect = zone ? 'copy' : 'none';
+      return;
+    }
+    if (draggedMediaCard) {
+      const grid = event.target.closest('[data-media-grid]')
+        || event.target.closest('[data-location-group]')?.querySelector('[data-media-grid]')
+        || event.target.closest('[data-ref-category]')?.querySelector('[data-media-grid]');
+      const sourceCategory = draggedMediaCard.closest('[data-ref-category]');
+      if (!grid || grid.closest('[data-ref-category]') !== sourceCategory) return;
+      const targetCard = event.target.closest('.media-card:not(.media-add)');
+      if (targetCard && targetCard !== draggedMediaCard) {
+        event.preventDefault();
+        const rect = targetCard.getBoundingClientRect();
+        const after = event.clientY > rect.top + rect.height / 2
+          || (Math.abs(event.clientY - rect.top - rect.height / 2) < rect.height * .25 && event.clientX > rect.left + rect.width / 2);
+        after ? targetCard.after(draggedMediaCard) : targetCard.before(draggedMediaCard);
+        if (event.dataTransfer) event.dataTransfer.dropEffect = 'move';
+      } else if (grid && (event.target.closest('.media-add') || event.target === grid)) {
+        event.preventDefault();
+        grid.querySelector('.media-add')?.before(draggedMediaCard);
+        if (event.dataTransfer) event.dataTransfer.dropEffect = 'move';
+      }
+      return;
+    }
+    const row = event.target.closest('.shot-row');
+    if (!draggedRow || !row || row === draggedRow) return;
+    event.preventDefault();
+    const rect = row.getBoundingClientRect();
+    row.parentNode.insertBefore(draggedRow, event.clientY < rect.top + rect.height / 2 ? row : row.nextSibling);
+  });
+  document.addEventListener('dragend', () => {
+    if (draggedRow) {
+      draggedRow.classList.remove('dragging'); renumberShots();
+      const origin = draggedRowOrigin, destination = {parent: draggedRow.parentElement, index: shotRowsIn(draggedRow.parentElement).indexOf(draggedRow)};
+      if (origin && (origin.parent !== destination.parent || origin.index !== destination.index)) {
+        const orderAfter = readShotOrder(), row = draggedRow;
+        recordAction({label: '調整 Shot 次序', undo: () => { placeShotAt(origin.parent, row, origin.index); restoreShotNumbers(); writeShotOrder(origin.order); }, redo: () => { placeShotAt(destination.parent, row, destination.index); restoreShotNumbers(); writeShotOrder(orderAfter); }});
+      }
+    }
+    if (draggedMediaCard) { draggedMediaCard.classList.remove('dragging'); upgradeMediaGrid(draggedMediaCard.closest('[data-media-grid]')); }
+    draggedRow = null;
+    draggedRowOrigin = null;
+    draggedMediaCard = null;
+    void persist();
+  });
+  document.addEventListener('dragleave', event => {
+    const zone = event.target.closest('.drop-active');
+    if (zone && !zone.contains(event.relatedTarget)) zone.classList.remove('drop-active');
+  });
+  document.addEventListener('drop', event => {
+    document.querySelectorAll('.drop-active').forEach(node => node.classList.remove('drop-active'));
+    if (draggedMediaCard) { event.preventDefault(); return; }
+    const files = Array.from(event.dataTransfer?.files || []);
+    if (!files.length) return;
+    event.preventDefault(); // Never navigate away from work when a file misses a drop zone.
+    if (!ready) return toast('正在恢復已保存內容，請稍候。');
+    const grid = event.target.closest('[data-media-grid]')
+      || event.target.closest('[data-location-group]')?.querySelector('[data-media-grid]')
+      || event.target.closest('[data-ref-category]')?.querySelector('[data-media-grid]')
+      || event.target.closest('[data-free-section]')?.querySelector('[data-media-grid]');
+    const cell = event.target.closest('.ref-cell');
+    const locationCell = event.target.closest('.location-cell');
+    if (grid) void addImages(files, event.target.closest('.media-add') || grid, 'set');
+    else if (cell) void addImages(files, cell);
+    else if (locationCell) void addImages(files, locationCell, 'location');
+    else toast('請把圖片拖到 Ref 或 Location。');
+  });
+  const initialize = async () => {
+    board().inert = true; $('.toolbar').inert = true;
+    $('#saveStatus').textContent = '正在恢復…';
+    let record = null;
+    try {
+      try { record = JSON.parse(localStorage.getItem(CACHE_KEY)); } catch {}
+      if (!record?.html) {
+        const legacy = localStorage.getItem(STORAGE_KEY);
+        if (legacy) record = {html: legacy, undoHTML: localStorage.getItem(BACKUP_KEY), updatedAt: 0};
+      }
+    } catch { /* IndexedDB or the embedded document may still be available. */ }
+    try {
+      const stored = await databaseRecord();
+      if (stored?.html && (!record?.html || stored.updatedAt > record.updatedAt)) record = stored;
+    } catch { /* Use the small checkpoint or embedded content. */ }
+    if (record?.html) { restoreBoard(record.html); undoSnapshot = record.undoHTML || null; sceneUndoSnapshot = record.undoSceneHTML || null; }
+    else upgradeBoard();
+    $('#undoImportBtn').hidden = !undoSnapshot;
+    $('#undoSceneBtn').hidden = !sceneUndoSnapshot;
+    $('#regenerateBtn').hidden = !$('.script-source pre');
+    board().inert = false; $('.toolbar').inert = false; ready = true;
+    updateHistoryButtons();
+    document.body.dataset.ready = 'true';
+    $('#saveStatus').textContent = record ? '已恢復本機紀錄' : '自動保存已開啟';
+    // Migrate old drafts and repair an interrupted IndexedDB save from the checkpoint.
+    if (record) void persist();
+    void repairLegacyHeicImages();
+    sceneUndoRevision = saveRevision;
+  };
+  void initialize();
+})();
+  </script>
+</body>
+</html>

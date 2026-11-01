@@ -351,7 +351,7 @@
 <body>
   <header class="appbar">
     <div class="brand">
-      <strong>Storyboard Editor · v0.31</strong>
+      <strong>Storyboard Editor · v0.32</strong>
       <small>直接編輯 · 自動保存於此瀏覽器</small>
     </div>
     <div class="toolbar">
@@ -410,6 +410,18 @@
         </section>
       </div>
 
+      <section class="free-section" data-order-section>
+        <div class="free-head" contenteditable="true">shot order</div>
+        <div class="table-wrap">
+          <table class="order-table">
+            <thead><tr><th>時間</th><th>拍攝內容</th><th>Shot / Notes</th></tr></thead>
+            <tbody>
+              <tr><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
       <section class="free-section" data-free-section>
         <div class="free-head" contenteditable="true">Ref</div>
         <div class="ref-category" data-ref-category="location">
@@ -423,18 +435,6 @@
           <div class="media-grid" data-media-grid>
             <label class="media-card media-add">＋ 加入影視參考<input type="file" accept="image/*,.heic,.heif" data-media-input /></label>
           </div>
-        </div>
-      </section>
-
-      <section class="free-section" data-order-section>
-        <div class="free-head" contenteditable="true">shot order</div>
-        <div class="table-wrap">
-          <table class="order-table">
-            <thead><tr><th>時間</th><th>拍攝內容</th><th>Shot / Notes</th></tr></thead>
-            <tbody>
-              <tr><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td></tr>
-            </tbody>
-          </table>
         </div>
       </section>
 
@@ -1083,6 +1083,9 @@
         hint.textContent = isLocation ? '把照片拖到這個地點，或點下方加入（可多張）' : '把圖片拖到這一行（可多張），或點下方選擇照片'; grid.before(hint);
       }
     });
+    const orderSection = board().querySelector('[data-order-section]');
+    const refSection = board().querySelector('[data-free-section]');
+    if (orderSection && refSection && orderSection.nextElementSibling !== refSection) refSection.before(orderSection);
     const footer = $('.footer-note');
     if (footer) footer.innerHTML = '<span>直接改字；拖動 Shot 請抓鏡號下方的「拖動」。</span><span>資料只存於此瀏覽器 · 用 HTML／工程備份帶到其他裝置</span>';
   };
@@ -1545,7 +1548,7 @@
   const exportProject = async () => {
     if (pendingImages) return toast('正在加入圖片，完成後再備份。');
     commitEditorEdit(true);
-    const data = {format: 'micy-storyboard-project', version: 1, editorVersion: '0.31', exportedAt: new Date().toISOString(), boardHTML: snapshot()};
+    const data = {format: 'micy-storyboard-project', version: 1, editorVersion: '0.32', exportedAt: new Date().toISOString(), boardHTML: snapshot()};
     const blob = new Blob([JSON.stringify(data)], {type: 'application/json;charset=utf-8'});
     return saveProjectFile(blob, datedFilename('storyboard.json'), 'Storyboard 工程備份', '.json', 'application/json');
   };
