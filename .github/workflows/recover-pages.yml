@@ -1,0 +1,19 @@
+# Temporary recovery approved by the owner; remove after release.
+name: Recover stalled Pages deployment
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/recover-pages.yml']
+  workflow_dispatch:
+permissions:
+  pages: write
+jobs:
+  recover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Release the specific stale deployment blocking v0.32
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: gh api --method POST "repos/${GH_REPO}/pages/deployments/4c00e0df221c0067dc236c1a75a35a4d2b920ce9/cancel"
